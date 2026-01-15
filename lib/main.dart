@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:device_preview/device_preview.dart';
 import 'screens/home_screen.dart';
+import 'screens/cart.dart';
+import 'screens/notification.dart';
+import 'screens/favourite.dart';
+import 'screens/account.dart';
 
 void main() {
   runApp(
     DevicePreview(
-      enabled: true,
+      enabled: true, 
       builder: (context) => const MyApp(),
     ),
   );
@@ -31,8 +35,13 @@ class MyApp extends StatelessWidget {
       ),
       initialRoute: '/home',
 routes: {
+
   '/home': (context) => const HomeScreen(),
-    },
+  '/cart': (context) => const CartScreen(),
+  '/notification': (context) => const NotificationsScreen(),
+  '/favourite': (context) => const Favourite(),
+  '/account': (context) => const AccountScreen(),
+},
     );
   }
 }
