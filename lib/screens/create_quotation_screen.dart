@@ -1,0 +1,316 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+class CreateQuotationScreen extends StatefulWidget {
+  const CreateQuotationScreen({super.key});
+
+  @override
+  State<CreateQuotationScreen> createState() => _CreateQuotationScreenState();
+}
+
+class _CreateQuotationScreenState extends State<CreateQuotationScreen> {
+  final _formKey = GlobalKey<FormState>();
+
+  String _selectedPackage = 'Day Out Package';
+  final List<String> _packages = [
+    'Day Out Package',
+    'Stay Package',
+    'Stay',
+    'Add New Package',
+  ];
+
+  final TextEditingController _customPackageController =
+      TextEditingController();
+
+  DateTime? _checkInDate;
+  DateTime? _checkOutDate;
+
+  TimeOfDay? _checkInTime;
+  TimeOfDay? _checkOutTime;
+
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _phone1Controller = TextEditingController();
+  final TextEditingController _phone2Controller = TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
+
+  final TextEditingController _adultController =
+      TextEditingController(text: '0');
+  final TextEditingController _childrenController =
+      TextEditingController(text: '0');
+  final TextEditingController _childController =
+      TextEditingController(text: '0');
+
+  int get totalPax {
+    return int.tryParse(_adultController.text)!.toInt() +
+        int.tryParse(_childrenController.text)!.toInt() +
+        int.tryParse(_childController.text)!.toInt();
+  }
+
+  Future<void> _pickDate({required bool isCheckIn}) async {
+    final picked = await showDatePicker(
+      context: context,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialDate: DateTime.now(),
+    );
+
+    if (picked != null) {
+      setState(() {
+        if (isCheckIn) {
+          _checkInDate = picked;
+          if (_selectedPackage == 'Day Out Package') {
+            _checkOutDate = picked;
+          }
+        } else {
+          _checkOutDate = picked;
+        }
+      });
+    }
+  }
+
+  Future<void> _pickTime({required bool isCheckIn}) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
+
+    if (picked != null) {
+      setState(() {
+        isCheckIn ? _checkInTime = picked : _checkOutTime = picked;
+      });
+    }
+  }
+
+  String _formatDate(DateTime? date) =>
+      date == null ? '' : DateFormat('dd MMM yyyy').format(date);
+
+  String _formatTime(TimeOfDay? time) =>
+      time == null ? '' : time.format(context);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Create Quotation')),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                /// PACKAGE DROPDOWN
+                DropdownButtonFormField<String>(
+                  value: _selectedPackage,
+                  decoration: const InputDecoration(
+                    labelText: 'Package',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: _packages
+                      .map(
+                        (e) => DropdownMenuItem(
+                          value: e,
+                          child: Text(e),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedPackage = value!;
+                      if (_selectedPackage == 'Day Out Package' &&
+                          _checkInDate != null) {
+                        _checkOutDate = _checkInDate;
+                      }
+                    });
+                  },
+                ),
+
+                if (_selectedPackage == 'Add New Package')
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: TextFormField(
+                      controller: _customPackageController,
+                      decoration: const InputDecoration(
+                        labelText: 'Enter Package Name',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+
+                const SizedBox(height: 20),
+
+                /// CHECK IN / OUT
+                Row(
+                  children: [
+                    Expanded(
+                      child: _dateTimeBox(
+                        label: 'Check In Date',
+                        value: _formatDate(_checkInDate),
+                        onTap: () => _pickDate(isCheckIn: true),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _dateTimeBox(
+                        label: 'Check In Time',
+                        value: _formatTime(_checkInTime),
+                        onTap: () => _pickTime(isCheckIn: true),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _dateTimeBox(
+                        label: 'Check Out Date',
+                        value: _formatDate(_checkOutDate),
+                        onTap: _selectedPackage == 'Day Out Package'
+                            ? null
+                            : () => _pickDate(isCheckIn: false),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _dateTimeBox(
+                        label: 'Check Out Time',
+                        value: _formatTime(_checkOutTime),
+                        onTap: () => _pickTime(isCheckIn: false),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+
+                /// CUSTOMER DETAILS
+                _requiredField(_nameController, 'Customer Name'),
+                const SizedBox(height: 12),
+                _requiredField(_phone1Controller, 'Phone Number 1'),
+                const SizedBox(height: 12),
+                _optionalField(_phone2Controller, 'Phone Number 2'),
+                const SizedBox(height: 12),
+                _optionalField(_addressController, 'Address', maxLines: 3),
+
+                const SizedBox(height: 20),
+
+                /// PAX
+                Row(
+                  children: [
+                    _paxBox(_adultController, 'Adult'),
+                    const SizedBox(width: 8),
+                    _paxBox(_childrenController, 'Children'),
+                    const SizedBox(width: 8),
+                    _paxBox(_childController, 'Child'),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'Total Pax: ${_adultController.text}+${_childrenController.text}+${_childController.text} = $totalPax',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+
+                const SizedBox(height: 30),
+
+                /// NEXT BUTTON
+                ElevatedButton(
+  onPressed: () {
+    if (_formKey.currentState!.validate()) {
+      Navigator.pushNamed(
+        context,
+        '/room_select_screen',
+        arguments: {
+          'package': _selectedPackage == 'Add New Package'
+              ? _customPackageController.text
+              : _selectedPackage,
+          'checkInDate': _checkInDate,
+          'checkOutDate': _checkOutDate,
+          'checkInTime': _checkInTime,
+          'checkOutTime': _checkOutTime,
+          'customerName': _nameController.text,
+          'phone1': _phone1Controller.text,
+          'phone2': _phone2Controller.text,
+          'address': _addressController.text,
+          'adult': _adultController.text,
+          'children': _childrenController.text,
+          'child': _childController.text,
+          'totalPax': totalPax,
+        },
+      );
+    }
+  },
+  child: const Text('Next'),
+)
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _dateTimeBox({
+    required String label,
+    required String value,
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+        ),
+        child: Text(value.isEmpty ? 'Select' : value),
+      ),
+    );
+  }
+
+  Widget _requiredField(TextEditingController controller, String label) {
+    return TextFormField(
+      controller: controller,
+      validator: (v) => v!.isEmpty ? 'Required' : null,
+      decoration: InputDecoration(
+        labelText: '$label *',
+        border: const OutlineInputBorder(),
+      ),
+    );
+  }
+
+  Widget _optionalField(TextEditingController controller, String label,
+      {int maxLines = 1}) {
+    return TextFormField(
+      controller: controller,
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+      ),
+    );
+  }
+
+ Widget _paxBox(TextEditingController controller, String label) {
+  return Expanded(
+    child: TextField(
+      controller: controller,
+      keyboardType: TextInputType.number,
+      textAlign: TextAlign.center,
+      decoration: InputDecoration(
+        labelText: label, // Adult / Children / Child
+        floatingLabelBehavior: FloatingLabelBehavior.always,
+        border: const OutlineInputBorder(),
+        contentPadding: const EdgeInsets.symmetric(
+          vertical: 14,
+          horizontal: 8,
+        ),
+      ),
+      onChanged: (_) => setState(() {}),
+    ),
+  );
+}
+}
