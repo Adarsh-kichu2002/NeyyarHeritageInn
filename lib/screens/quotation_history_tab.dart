@@ -19,7 +19,8 @@ class _QuotationHistoryTabState extends State<QuotationHistoryTab> {
     final store = context.watch<QuotationHistoryStore>();
 
     /// APPLY DATE FILTER (CHECK-IN DATE)
-    final filtered = store.quotations.where((q) {
+    final filteredWithIndex = store.quotations.asMap().entries.where((entry) {
+      final q = entry.value;
       final DateTime? checkIn = q['checkInDate'];
       if (checkIn == null) return false;
 
@@ -60,7 +61,7 @@ class _QuotationHistoryTabState extends State<QuotationHistoryTab> {
 
         /// TABLE
         Expanded(
-          child: filtered.isEmpty
+          child: filteredWithIndex.isEmpty
               ? const Center(child: Text('No quotations found'))
               : SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
@@ -74,72 +75,81 @@ class _QuotationHistoryTabState extends State<QuotationHistoryTab> {
                       DataColumn(label: Text('Check Out')),
                       DataColumn(label: Text('Actions')),
                     ],
-                    rows: List.generate(filtered.length, (i) {
-                      final q = filtered[i];
-                      return DataRow(cells: [
-                        DataCell(Text('${i + 1}')),
-                        DataCell(Text(q['customerName'] ?? '')),
-                        DataCell(Text(q['phone1'] ?? '')),
-                        DataCell(Text(q['package'] ?? '')),
-                        DataCell(Text(_fmt(q['checkInDate']))),
-                        DataCell(Text(_fmt(q['checkOutDate']))),
-                        DataCell(Row(
-                          children: [
-                            /// VIEW QUOTATION
-                            IconButton(
-                              icon: const Icon(Icons.visibility),
-                              tooltip: 'View',
-                              onPressed: () {
-                                Navigator.pushNamed(
-                                  context,
-                                  '/quotation_preview',
-                                  arguments: q,
-                                );
-                              },
-                            ),
+                    rows: List.generate(filteredWithIndex.length, (i) {
+                      final entry = filteredWithIndex[i];
+                      final int realIndex = entry.key;
+                      final q = entry.value;
 
-                            /// EDIT QUOTATION (FULL FLOW)
-                            IconButton(
-                              icon: const Icon(Icons.edit),
-                              tooltip: 'Edit',
-                              onPressed: () {
-                                Navigator.pushNamed(
-                                  context,
-                                  '/create_quotation',
-                                  arguments: {
-                                    'mode': 'edit',
-                                    'data': q,
+                      return DataRow(
+                        key: ValueKey(realIndex),
+                        cells: [
+                          DataCell(Text('${i + 1}')),
+                          DataCell(Text(q['customerName'] ?? '')),
+                          DataCell(Text(q['phone1'] ?? '')),
+                          DataCell(Text(q['package'] ?? '')),
+                          DataCell(Text(_fmt(q['checkInDate']))),
+                          DataCell(Text(_fmt(q['checkOutDate']))),
+                          DataCell(
+                            Row(
+                              children: [
+                                /// VIEW
+                                IconButton(
+                                  icon: const Icon(Icons.visibility),
+                                  tooltip: 'View',
+                                  onPressed: () {
+                                    Navigator.pushNamed(
+                                      context,
+                                      '/quotation_preview',
+                                      arguments: {
+                                        ...q,
+                                        'historyIndex': realIndex,
+                                      },
+                                    );
                                   },
-                                );
-                              },
-                            ),
+                                ),
 
-                            /// DELETE
-                            IconButton(
-                              icon: const Icon(Icons.delete),
-                              tooltip: 'Delete',
-                              onPressed: () {
-                                context
-                                    .read<QuotationHistoryStore>()
-                                    .deleteQuotationById(q['id']);
-                              },
-                            ),
+                                /// EDIT
+                                IconButton(
+                                  icon: const Icon(Icons.edit),
+                                  tooltip: 'Edit',
+                                  onPressed: () {
+                                    Navigator.pushNamed(
+                                      context,
+                                      '/create_quotation',
+                                      arguments: {
+                                        ...q,
+                                        'historyIndex': realIndex,
+                                      },
+                                    );
+                                  },
+                                ),
 
-                            /// GENERATE BILL
-                            IconButton(
-                              icon: const Icon(Icons.receipt_long),
-                              tooltip: 'Generate Bill',
-                              onPressed: () {
-                                Navigator.pushNamed(
-                                  context,
-                                  '/create_bill',
-                                  arguments: q,
-                                );
-                              },
+                                /// DELETE WITH CONFIRMATION
+IconButton(
+  icon: const Icon(Icons.delete),
+  tooltip: 'Delete',
+  onPressed: () {
+    _confirmDelete(context, q['historyIndex']);
+  },
+),
+
+                                /// GENERATE BILL
+                                IconButton(
+                                  icon: const Icon(Icons.receipt_long),
+                                  tooltip: 'Generate Bill',
+                                  onPressed: () {
+                                    Navigator.pushNamed(
+                                      context,
+                                      '/bill_screen',
+                                      arguments: q,
+                                    );
+                                  },
+                                ),
+                              ],
                             ),
-                          ],
-                        )),
-                      ]);
+                          ),
+                        ],
+                      );
                     }),
                   ),
                 ),
@@ -169,6 +179,34 @@ class _QuotationHistoryTabState extends State<QuotationHistoryTab> {
       },
     );
   }
+
+  Future<void> _confirmDelete(BuildContext context, int index) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text('Delete Quotation'),
+      content: const Text(
+        'Are you sure you want to delete this quotation? '
+        'This action cannot be undone.',
+      ),
+      actions: [
+        TextButton(
+          child: const Text('No'),
+          onPressed: () => Navigator.pop(context, false),
+        ),
+        ElevatedButton(
+          child: const Text('Yes'),
+          onPressed: () => Navigator.pop(context, true),
+        ),
+      ],
+    ),
+  );
+
+  if (confirmed == true) {
+    context.read<QuotationHistoryStore>().deleteQuotation(index);
+  }
+}
+
 
   /// FORMAT DATE
   String _fmt(DateTime? d) =>

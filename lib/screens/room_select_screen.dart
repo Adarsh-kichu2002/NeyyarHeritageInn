@@ -10,20 +10,8 @@ class RoomSelectScreen extends StatefulWidget {
 class _RoomSelectScreenState extends State<RoomSelectScreen> {
   late Map<String, dynamic> quotationData;
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    quotationData =
-        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ??
-            {};
-  }
-
-  /// ROOMS WITH QTY
-  final List<Map<String, dynamic>> rooms = [
-    {'name': 'AC Suite Room', 'price': 3500, 'qty': 1, 'selected': false},
-    {'name': 'Hut', 'price': 2500, 'qty': 1, 'selected': false},
-    {'name': 'Non-AC Room', 'price': 2000, 'qty': 1, 'selected': false},
-  ];
+  /// ROOMS (editable)
+  late List<Map<String, dynamic>> rooms;
 
   /// EXTRA PERSONS
   final TextEditingController extraPersonCtrl =
@@ -31,29 +19,65 @@ class _RoomSelectScreenState extends State<RoomSelectScreen> {
   final TextEditingController extraPersonPriceCtrl =
       TextEditingController(text: '1000');
 
-   
   /// CUSTOM ITEM
   final TextEditingController customItemNameCtrl = TextEditingController();
   final TextEditingController customItemPriceCtrl =
-      TextEditingController(text: '0');   
+      TextEditingController(text: '0');
 
   /// DISCOUNT
   final TextEditingController discountCtrl =
       TextEditingController(text: '0');
 
   /// FACILITIES
-  final List<String> facilities = [
-    'Welcome Drinks',
-    'Medium Pool (2 Hrs)',
-    'Waterfall & Rain Dance (30 minutes)',
-    'Children Play Area',
-    'Breakfast (Next Day)',
-  ];
+  late List<String> facilities;
   final TextEditingController facilityCtrl = TextEditingController();
+
+  bool _initialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    if (_initialized) return;
+
+    quotationData =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ??
+            {};
+
+    /// LOAD ROOMS (EDIT OR NEW)
+    rooms = quotationData['rooms'] != null
+        ? List<Map<String, dynamic>>.from(
+            quotationData['rooms'].map((r) => Map<String, dynamic>.from(r)))
+        : [
+            {'name': 'AC Suite Room', 'price': 3500, 'qty': 1, 'selected': false},
+            {'name': 'Hut', 'price': 2500, 'qty': 1, 'selected': false},
+            {'name': 'Non-AC Room', 'price': 2000, 'qty': 1, 'selected': false},
+          ];
+
+    /// LOAD EXTRA & DISCOUNT
+    extraPersonCtrl.text =
+        quotationData['extraPersons']?.toString() ?? '0';
+    extraPersonPriceCtrl.text =
+        quotationData['extraPersonPrice']?.toString() ?? '1000';
+    discountCtrl.text = quotationData['discount']?.toString() ?? '0';
+
+    /// LOAD FACILITIES
+    facilities = quotationData['facilities'] != null
+        ? List<String>.from(quotationData['facilities'])
+        : [
+            'Welcome Drinks',
+            'Medium Pool (2 Hrs)',
+            'Waterfall & Rain Dance (30 minutes)',
+            'Children Play Area',
+            'Breakfast (Next Day)',
+          ];
+
+    _initialized = true;
+  }
 
   int get roomTotal => rooms
       .where((r) => r['selected'])
-      .fold(0, (s, r) => s + ((r['price'] as int) * (r['qty'] as int)));
+      .fold(0, (s, r) => s + ((r['price'] * r['qty']) as int));
 
   int get extraTotal =>
       (int.tryParse(extraPersonCtrl.text) ?? 0) *
@@ -77,33 +101,14 @@ class _RoomSelectScreenState extends State<RoomSelectScreen> {
 
           ...rooms.map(_roomTile),
 
-           /// ADD CUSTOM ITEM
           const SizedBox(height: 12),
-          ElevatedButton(
-  onPressed: () {
-    if (customItemNameCtrl.text.isEmpty) return;
 
-    setState(() {
-      rooms.add({
-        'name': customItemNameCtrl.text.trim(),
-        'price': int.tryParse(customItemPriceCtrl.text) ?? 0,
-        'qty': 1,                 
-        'selected': false,
-      });
-
-      customItemNameCtrl.clear();
-      customItemPriceCtrl.text = '0';
-    });
-  },
-  child: const Text('Add Custom Item'),
-),
-
+          /// ADD CUSTOM ITEM
           Row(children: [
             Expanded(
               child: TextField(
                 controller: customItemNameCtrl,
-                decoration:
-                    const InputDecoration(labelText: 'Item Name'),
+                decoration: const InputDecoration(labelText: 'Item Name'),
               ),
             ),
             const SizedBox(width: 8),
@@ -111,14 +116,29 @@ class _RoomSelectScreenState extends State<RoomSelectScreen> {
               child: TextField(
                 controller: customItemPriceCtrl,
                 keyboardType: TextInputType.number,
-                decoration:
-                    const InputDecoration(labelText: 'Amount'),
+                decoration: const InputDecoration(labelText: 'Amount'),
               ),
             ),
           ]),
+          const SizedBox(height: 8),
+          ElevatedButton(
+            onPressed: () {
+              if (customItemNameCtrl.text.isEmpty) return;
+              setState(() {
+                rooms.add({
+                  'name': customItemNameCtrl.text.trim(),
+                  'price': int.tryParse(customItemPriceCtrl.text) ?? 0,
+                  'qty': 1,
+                  'selected': true,
+                });
+                customItemNameCtrl.clear();
+                customItemPriceCtrl.text = '0';
+              });
+            },
+            child: const Text('Add Custom Item'),
+          ),
 
           const Divider(height: 32),
-
 
           /// EXTRA PERSONS
           const Text('Extra Persons'),
@@ -147,8 +167,7 @@ class _RoomSelectScreenState extends State<RoomSelectScreen> {
             Expanded(
               child: TextField(
                 controller: facilityCtrl,
-                decoration:
-                    const InputDecoration(hintText: 'Add facility'),
+                decoration: const InputDecoration(hintText: 'Add facility'),
               ),
             ),
             IconButton(
@@ -156,7 +175,7 @@ class _RoomSelectScreenState extends State<RoomSelectScreen> {
               onPressed: () {
                 if (facilityCtrl.text.isEmpty) return;
                 setState(() {
-                  facilities.add(facilityCtrl.text);
+                  facilities.add(facilityCtrl.text.trim());
                   facilityCtrl.clear();
                 });
               },
@@ -189,6 +208,7 @@ class _RoomSelectScreenState extends State<RoomSelectScreen> {
 
           const SizedBox(height: 24),
 
+          /// PREVIEW
           ElevatedButton(
             onPressed: () {
               Navigator.pushNamed(
@@ -220,35 +240,30 @@ class _RoomSelectScreenState extends State<RoomSelectScreen> {
         child: Row(children: [
           Checkbox(
             value: room['selected'],
-            onChanged: (v) => setState(() => room['selected'] = v!),
+            onChanged: (v) => setState(() => room['selected'] = v),
           ),
           Expanded(flex: 3, child: Text(room['name'])),
 
-          /// QTY
           SizedBox(
             width: 50,
             child: TextField(
               keyboardType: TextInputType.number,
               textAlign: TextAlign.center,
-              decoration: const InputDecoration(labelText: 'Qty'),
               controller:
                   TextEditingController(text: room['qty'].toString()),
               onChanged: (v) {
-  room['qty'] = (int.tryParse(v) ?? 1).clamp(1, 999);
-  setState(() {});
-},
+                room['qty'] = (int.tryParse(v) ?? 1).clamp(1, 999);
+                setState(() {});
+              },
             ),
           ),
 
           const SizedBox(width: 8),
 
-          /// PRICE
           SizedBox(
             width: 80,
             child: TextField(
               keyboardType: TextInputType.number,
-              decoration:
-                  const InputDecoration(prefixText: '₹ '),
               controller:
                   TextEditingController(text: room['price'].toString()),
               onChanged: (v) {
@@ -260,7 +275,6 @@ class _RoomSelectScreenState extends State<RoomSelectScreen> {
 
           const SizedBox(width: 8),
 
-          /// TOTAL
           Text(
             '₹${room['price'] * room['qty']}',
             style: const TextStyle(fontWeight: FontWeight.bold),
@@ -275,8 +289,10 @@ class _RoomSelectScreenState extends State<RoomSelectScreen> {
       child: TextField(
         controller: c,
         keyboardType: TextInputType.number,
-        decoration:
-            InputDecoration(labelText: label, border: const OutlineInputBorder()),
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+        ),
         onChanged: (_) => setState(() {}),
       ),
     );

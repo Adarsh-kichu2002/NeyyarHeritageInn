@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:neyyar_heritage/screens/bill_history_tab.dart';
 import 'quotation_history_tab.dart';
 
 class HistoryScreen extends StatelessWidget {
@@ -20,7 +21,7 @@ class HistoryScreen extends StatelessWidget {
             child: TabBarView(
               children: [
                 QuotationHistoryTab(),
-                Center(child: Text('Bills coming soon')),
+                BillHistoryTab(),
               ],
             ),
           ),

@@ -11,6 +11,9 @@ class CreateQuotationScreen extends StatefulWidget {
 class _CreateQuotationScreenState extends State<CreateQuotationScreen> {
   final _formKey = GlobalKey<FormState>();
 
+  late String mode;
+  late Map<String, dynamic> data;
+
   String _selectedPackage = 'Day Out Package';
   final List<String> _packages = [
     'Day Out Package',
@@ -25,8 +28,8 @@ class _CreateQuotationScreenState extends State<CreateQuotationScreen> {
   DateTime? _checkInDate;
   DateTime? _checkOutDate;
 
-  TimeOfDay? _checkInTime;
-  TimeOfDay? _checkOutTime;
+  TimeOfDay? _checkInTime = const TimeOfDay(hour: 12, minute: 0);   
+  TimeOfDay? _checkOutTime = const TimeOfDay(hour: 10, minute: 30); 
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phone1Controller = TextEditingController();
@@ -86,11 +89,38 @@ class _CreateQuotationScreenState extends State<CreateQuotationScreen> {
 
   String _formatTime(TimeOfDay? time) =>
       time == null ? '' : time.format(context);
+  
+  
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final args =
+        ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
+
+    mode = args?['mode'] ?? 'create';
+    data = args?['data'] ?? {};
+
+    if (mode == 'edit') {
+      _prefillFields();
+    }
+  }
+
+  void _prefillFields() {
+    _nameController.text = data['customerName'] ?? '';
+    _phone1Controller.text = data['phone1'] ?? '';
+    // prefill all other fields
+  }
+      
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Create Quotation')),
+      appBar: AppBar(
+        title: Text(mode == 'edit'
+            ? 'Edit Quotation'
+            : 'Create Quotation'),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -276,7 +306,7 @@ class _CreateQuotationScreenState extends State<CreateQuotationScreen> {
       controller: controller,
       validator: (v) => v!.isEmpty ? 'Required' : null,
       decoration: InputDecoration(
-        labelText: '$label *',
+        labelText: '$label *',iconColor: Colors.red,
         border: const OutlineInputBorder(),
       ),
     );

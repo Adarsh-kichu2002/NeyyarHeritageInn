@@ -46,20 +46,23 @@ void didChangeDependencies() {
 
   @override
   Widget build(BuildContext context) {
-    if (data.isEmpty) {
+    final Map<String, dynamic> extractedData =
+        ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>? ?? {};
+    
+    if (extractedData.isEmpty) {
   return const Scaffold(
     body: Center(
       child: Text(
         'No quotation data found',
-        style: TextStyle(fontSize: 16),
+        style: TextStyle(fontSize: 16, color: Colors.red),
       ),
     ),
   );
 }
 
-    
-    final rooms = data['rooms'] as List;
-    final facilities = data['facilities'] as List;
+    final rooms = extractedData['rooms'] as List;
+    final facilities = extractedData['facilities'] as List;
+    data = extractedData;
     
 
     return Scaffold(
@@ -102,14 +105,14 @@ void didChangeDependencies() {
             /// CUSTOMER DETAILS
             const Text('To,'),
             Text(
-              data['customerName'],
+              extractedData['customerName'],
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            Text('Mob: ${data['phone1']}'),
-            if (data['phone2'].toString().isNotEmpty)
-              Text('Alt Mob: ${data['phone2']}'),
-            if (data['address'].toString().isNotEmpty)
-              Text(data['address']),
+            Text('Mob: ${extractedData['phone1']}'),
+            if (extractedData['phone2'].toString().isNotEmpty)
+              Text('Alt Mob: ${extractedData['phone2']}'),
+            if (extractedData['address'].toString().isNotEmpty)
+              Text(extractedData['address']),
 
             const SizedBox(height: 16),
 
@@ -129,13 +132,13 @@ void didChangeDependencies() {
         text: ' for your upcoming ',
       ),
                   TextSpan(
-                    text: data['package'],
+                    text: extractedData['package'],
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   TextSpan(
                     text:
-                        ' (Check In: ${_date(data['checkInDate'])} ${_time(data['checkInTime'])}, '
-                        'Check Out: ${_date(data['checkOutDate'])} ${_time(data['checkOutTime'])}).',
+                        ' (Check In: ${_date(extractedData['checkInDate'])} ${_time(extractedData['checkInTime'])}, '
+                        'Check Out: ${_date(extractedData['checkOutDate'])} ${_time(extractedData['checkOutTime'])}).',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                  const TextSpan(
@@ -174,12 +177,12 @@ void didChangeDependencies() {
             const SizedBox(height: 16),
 
             
-          if (data['extraTotal'] > 0)
+          if (extractedData['extraTotal'] > 0)
             Text(
-                'Extra Persons (${data['extraPersons']} x ${data['extraPersonPrice']}) ₹${data['extraTotal']}'),
+                'Extra Persons (${extractedData['extraPersons']} x ${extractedData['extraPersonPrice']}) ₹${extractedData['extraTotal']}'),
 
-          if (data['discount'] > 0)
-            Text('Discount  -₹${data['discount']}',
+          if (extractedData['discount'] > 0)
+            Text('Discount  -₹${extractedData['discount']}',
                 style: const TextStyle(color: Colors.red)),
 
           const SizedBox(height: 16),
@@ -187,7 +190,7 @@ void didChangeDependencies() {
 
               /// PAX
             Text(
-              'Pax -- ${data['adult']}+${data['children']}+${data['child']} = ${data['totalPax']}',
+              'Pax -- ${extractedData['adult']}+${extractedData['children']}+${extractedData['child']} = ${extractedData['totalPax']}',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
 
@@ -207,7 +210,7 @@ void didChangeDependencies() {
               Align(
                 alignment: Alignment.centerRight,
                 child: Text(
-                  'Total: ₹${data['total']}',
+                  'Total: ₹${extractedData['total']}',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -271,24 +274,43 @@ void didChangeDependencies() {
               const SizedBox(height: 24),
 
               // SAVE
-              SizedBox(
+SizedBox(
   width: double.infinity,
   child: ElevatedButton.icon(
     icon: const Icon(Icons.save),
     label: const Text('Save'),
     onPressed: () {
-      final store =
-          context.read<QuotationHistoryStore>();
+      final store = context.read<QuotationHistoryStore>();
 
-      store.addQuotation(data);
+      /// BUILD FINAL DATA
+      final Map<String, dynamic> finalData = {
+        ...data,
+        'savedAt': DateTime.now(),
+      };
+
+      /// UPDATE (EDIT MODE)
+      if (data.containsKey('historyIndex')) {
+        store.updateQuotation(
+          data['historyIndex'],
+          finalData,
+        );
+      }
+      /// ADD (NEW QUOTATION)
+      else {
+        store.addQuotation(finalData);
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Quotation saved to history')),
+        const SnackBar(
+          content: Text('Quotation saved successfully'),
+        ),
       );
+
+      /// RETURN TO HISTORY (IMPORTANT)
+      Navigator.pop(context);
     },
   ),
 ),
-
 
               /// DOWNLOAD
               SizedBox(

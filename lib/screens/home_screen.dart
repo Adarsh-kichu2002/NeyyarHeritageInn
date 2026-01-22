@@ -48,7 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 _actionBox(context,
                     icon: Icons.receipt_long,
                     title: 'Create Bill',
-                    route: '/create_bill'),
+                    route: '/bill_screen'),
               ],
             ),
           ),
