@@ -15,6 +15,17 @@ class _BillListScreenState extends State<BillListScreen> {
 
   final List<Map<String, dynamic>> items = [];
 
+  /// DEFAULT ITEMS
+  final List<Map<String, dynamic>> defaultItems = [
+    {'name': 'Mineral Water', 'qty': 0, 'price': 20},
+    {'name': 'Soda', 'qty': 0, 'price': 40},
+    {'name': 'Tea', 'qty': 0, 'price': 20},
+    {'name': 'Coffee', 'qty': 0, 'price': 25},
+    {'name': 'Porotta', 'qty': 0, 'price': 15},
+    {'name': 'Chicken Roast', 'qty': 0, 'price': 250},
+    {'name': 'Chicken Fry', 'qty': 0, 'price': 250},
+  ];
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -23,7 +34,7 @@ class _BillListScreenState extends State<BillListScreen> {
 
     data = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
 
-    /// PREFILL FROM QUOTATION
+    /// PREFILL FROM QUOTATION ROOMS
     final rooms = (data['rooms'] ?? []) as List;
     for (final r in rooms.where((r) => r['selected'] == true)) {
       items.add({
@@ -33,6 +44,7 @@ class _BillListScreenState extends State<BillListScreen> {
       });
     }
 
+    /// EXTRA PERSONS
     if ((data['extraTotal'] ?? 0) > 0) {
       items.add({
         'name': 'Extra Persons',
@@ -40,8 +52,12 @@ class _BillListScreenState extends State<BillListScreen> {
         'price': data['extraPersonPrice'] ?? 0,
       });
     }
+
+    /// ADD DEFAULT ITEMS
+    items.addAll(defaultItems.map((e) => Map<String, dynamic>.from(e)));
   }
 
+  /// TOTAL CALCULATIONS
   int get subtotal => items.fold(
         0,
         (s, i) =>
@@ -114,12 +130,18 @@ class _BillListScreenState extends State<BillListScreen> {
               child: ElevatedButton(
                 child: const Text('Preview Bill'),
                 onPressed: () {
+                  /// 🔑 FILTER ITEMS WITH QTY > 0 ONLY
+                  final previewItems = items
+                      .where((i) =>
+                          (int.tryParse(i['qty'].toString()) ?? 0) > 0)
+                      .toList();
+
                   Navigator.pushNamed(
                     context,
                     '/bill_preview',
                     arguments: {
                       ...data,
-                      'items': items,
+                      'items': previewItems,
                       'subtotal': subtotal,
                       'gst': gst,
                       'advance': advance,
@@ -135,6 +157,7 @@ class _BillListScreenState extends State<BillListScreen> {
     );
   }
 
+  /// ITEM EDITOR
   Widget _itemEditor(int index) {
     final item = items[index];
 
@@ -191,6 +214,7 @@ class _BillListScreenState extends State<BillListScreen> {
     );
   }
 
+  /// AMOUNT ROW
   Widget _amountRow(String label, int value, {bool bold = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,

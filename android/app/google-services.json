@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "790878467394",
+    "project_id": "neyyar-heritage",
+    "storage_bucket": "neyyar-heritage.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:790878467394:android:99c9e7cf234033786984db",
+        "android_client_info": {
+          "package_name": "com.example.neyyar_heritage"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCJ2KxHrXxZcbB7BjQf9wv9hB4p3J-VoeA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

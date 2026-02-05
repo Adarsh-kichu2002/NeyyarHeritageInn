@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:device_preview/device_preview.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
+
 import 'screens/splash_screen.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/home_screen.dart';
@@ -9,33 +11,48 @@ import 'screens/room_select_screen.dart';
 import 'screens/quotation_preview_screen.dart';
 import 'screens/history_screen.dart';
 import 'screens/quotation_history_tab.dart';
+
 import 'history/quotation_history_store.dart';
+
 import 'screens/bill_screen.dart';
 import 'screens/bill_list_screen.dart';
 import 'screens/bill_preview_screen.dart';
-import 'history/bill_history_store.dart';
 import 'screens/bill_history_tab.dart';
+import 'history/bill_history_store.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
 
-void main() {
-  runApp(
-    DevicePreview(
-      enabled: true, 
-      builder: (context) => MultiProvider(
-        providers: [
-          ChangeNotifierProvider(
-            create: (_) => QuotationHistoryStore(),
-          ),
-          ChangeNotifierProvider(
-            create: (_) => BillHistoryStore(),
-          ),
-        ],
-        child: const MyApp(),
-      ),
-    ),
-  );
+  // ✅ Initialize Firebase FIRST
+  await Firebase.initializeApp();
+
+  // SharedPreferences (optional but safe)
+  await SharedPreferences.getInstance();
+
+  runApp(const MyRoot());
+}
+
+class MyRoot extends StatelessWidget {
+  const MyRoot({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<QuotationHistoryStore>(
+          create: (_) => QuotationHistoryStore(),
+          lazy: false,
+        ),
+        ChangeNotifierProvider<BillHistoryStore>(
+          create: (_) => BillHistoryStore(),
+          lazy: false,
+        ),
+      ],
+      child: const MyApp(),
+    );
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -48,30 +65,29 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Neyyar Heritage Inn',
 
-      // REQUIRED for DevicePreview
-      useInheritedMediaQuery: true,
-      locale: DevicePreview.locale(context),
-      builder: DevicePreview.appBuilder,
-
       theme: ThemeData(
         primaryColor: Colors.blue,
         scaffoldBackgroundColor: Colors.white,
       ),
+
       initialRoute: '/',
-routes: {
-  '/': (context) => const SplashScreen(),
-  '/welcome': (context) => const WelcomeScreen(),
-  '/home': (context) => const HomeScreen(),
-  '/create_quotation': (context) => const CreateQuotationScreen(),
-  '/room_select_screen': (context) => const RoomSelectScreen(),
-  '/quotation_preview_screen': (context) => const QuotationPreviewScreen(),
-  '/history': (context) => const HistoryScreen(),
-  '/quotation_history_tab': (context) => const QuotationHistoryTab(),
-  '/bill_screen': (_) => const BillScreen(),
-  '/bill_list': (_) => const BillListScreen(),
-  '/bill_preview': (_) => const BillPreviewScreen(),
-  '/bill_history_tab': (context) => const BillHistoryTab(),
-},
+      routes: {
+        '/': (_) => const SplashScreen(),
+        '/welcome': (_) => const WelcomeScreen(),
+        '/home': (_) => const HomeScreen(),
+
+        '/create_quotation': (_) => const CreateQuotationScreen(),
+        '/room_select_screen': (_) => const RoomSelectScreen(),
+        '/quotation_preview_screen': (_) => const QuotationPreviewScreen(),
+
+        '/history': (_) => const HistoryScreen(),
+        '/quotation_history_tab': (_) => const QuotationHistoryTab(),
+
+        '/bill_screen': (_) => const BillScreen(),
+        '/bill_list': (_) => const BillListScreen(),
+        '/bill_preview': (_) => const BillPreviewScreen(),
+        '/bill_history_tab': (_) => const BillHistoryTab(),
+      },
     );
   }
 }

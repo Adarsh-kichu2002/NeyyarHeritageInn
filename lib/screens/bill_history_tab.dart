@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-
 import '../history/bill_history_store.dart';
 
 class BillHistoryTab extends StatefulWidget {
@@ -19,25 +18,24 @@ class _BillHistoryTabState extends State<BillHistoryTab> {
   Widget build(BuildContext context) {
     final store = context.watch<BillHistoryStore>();
 
-    /// FILTER BY CHECK-OUT DATE
-    final filtered = store.bills.asMap().entries.where((entry) {
-      final bill = entry.value;
+    if (store.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final filtered = store.bills.where((bill) {
       final DateTime? checkOut = bill['checkOutDate'];
 
+      if (from == null && to == null) return true;
       if (checkOut == null) return false;
 
-      if (from != null && checkOut.isBefore(_startOfDay(from!))) {
-        return false;
-      }
-      if (to != null && checkOut.isAfter(_endOfDay(to!))) {
-        return false;
-      }
+      if (from != null && checkOut.isBefore(_startOfDay(from!))) return false;
+      if (to != null && checkOut.isAfter(_endOfDay(to!))) return false;
+
       return true;
     }).toList();
 
     return Column(
       children: [
-        /// FILTER BAR
         Padding(
           padding: const EdgeInsets.all(8),
           child: Row(
@@ -52,16 +50,16 @@ class _BillHistoryTabState extends State<BillHistoryTab> {
               if (from != null || to != null)
                 IconButton(
                   icon: const Icon(Icons.clear),
-                  onPressed: () => setState(() {
-                    from = null;
-                    to = null;
-                  }),
+                  onPressed: () {
+                    setState(() {
+                      from = null;
+                      to = null;
+                    });
+                  },
                 ),
             ],
           ),
         ),
-
-        /// TABLE
         Expanded(
           child: filtered.isEmpty
               ? const Center(child: Text('No bills found'))
@@ -79,27 +77,22 @@ class _BillHistoryTabState extends State<BillHistoryTab> {
                       DataColumn(label: Text('Actions')),
                     ],
                     rows: List.generate(filtered.length, (i) {
-                      final entry = filtered[i];
-                      final int realIndex = entry.key;
-                      final b = entry.value;
+                      final b = filtered[i];
 
                       return DataRow(
-                        key: ValueKey(realIndex),
                         cells: [
                           DataCell(Text('${i + 1}')),
-                          DataCell(Text(b['invoiceNo'] ?? '')),
+                          DataCell(Text('${b['invoiceNo']}')),
                           DataCell(Text(b['customerName'] ?? '')),
-                          DataCell(Text(b['phone1'] ?? '')),
+                          DataCell(Text('${b['phone1']}')),
                           DataCell(Text(_fmt(b['checkInDate']))),
                           DataCell(Text(_fmt(b['checkOutDate']))),
-                          DataCell(Text('₹${b['balance'] ?? 0}')),
+                          DataCell(Text('₹${b['balance']}')),
                           DataCell(
                             Row(
                               children: [
-                                /// VIEW
                                 IconButton(
                                   icon: const Icon(Icons.visibility),
-                                  tooltip: 'View Bill',
                                   onPressed: () {
                                     Navigator.pushNamed(
                                       context,
@@ -108,13 +101,10 @@ class _BillHistoryTabState extends State<BillHistoryTab> {
                                     );
                                   },
                                 ),
-
-                                /// DELETE
                                 IconButton(
                                   icon: const Icon(Icons.delete),
-                                  tooltip: 'Delete',
                                   onPressed: () =>
-                                      _confirmDelete(context, realIndex),
+                                      _confirmDelete(context, b['invoiceNo']),
                                 ),
                               ],
                             ),
@@ -129,42 +119,32 @@ class _BillHistoryTabState extends State<BillHistoryTab> {
     );
   }
 
-  /// DELETE CONFIRMATION
-  Future<void> _confirmDelete(BuildContext context, int index) async {
-    final confirmed = await showDialog<bool>(
+  Future<void> _confirmDelete(BuildContext context, String invoiceNo) async {
+    final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Delete Bill'),
-        content: const Text(
-            'Are you sure you want to delete this bill? This action cannot be undone.'),
+        content: const Text('Are you sure?'),
         actions: [
           TextButton(
-            child: const Text('No'),
             onPressed: () => Navigator.pop(context, false),
+            child: const Text('No'),
           ),
           ElevatedButton(
-            child: const Text('Yes'),
             onPressed: () => Navigator.pop(context, true),
+            child: const Text('Yes'),
           ),
         ],
       ),
     );
 
-    if (confirmed == true) {
-      context.read<BillHistoryStore>().deleteBill(index);
+    if (ok == true) {
+      context.read<BillHistoryStore>().deleteBill(invoiceNo);
     }
   }
 
-  /// DATE PICKER
-  Widget _dateBox(
-    String label,
-    DateTime? value,
-    Function(DateTime) onPick,
-  ) {
+  Widget _dateBox(String label, DateTime? value, Function(DateTime) onPick) {
     return OutlinedButton(
-      child: Text(
-        value == null ? label : DateFormat('dd/MM/yyyy').format(value),
-      ),
       onPressed: () async {
         final d = await showDatePicker(
           context: context,
@@ -174,6 +154,9 @@ class _BillHistoryTabState extends State<BillHistoryTab> {
         );
         if (d != null) onPick(d);
       },
+      child: Text(
+        value == null ? label : DateFormat('dd/MM/yyyy').format(value),
+      ),
     );
   }
 
@@ -181,7 +164,7 @@ class _BillHistoryTabState extends State<BillHistoryTab> {
       d == null ? '' : DateFormat('dd/MM/yyyy').format(d);
 
   DateTime _startOfDay(DateTime d) =>
-      DateTime(d.year, d.month, d.day, 0, 0, 0);
+      DateTime(d.year, d.month, d.day);
 
   DateTime _endOfDay(DateTime d) =>
       DateTime(d.year, d.month, d.day, 23, 59, 59);

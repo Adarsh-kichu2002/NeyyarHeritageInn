@@ -18,18 +18,18 @@ class _QuotationHistoryTabState extends State<QuotationHistoryTab> {
   Widget build(BuildContext context) {
     final store = context.watch<QuotationHistoryStore>();
 
-    /// APPLY DATE FILTER (CHECK-IN DATE)
-    final filteredWithIndex = store.quotations.asMap().entries.where((entry) {
-      final q = entry.value;
-      final DateTime? checkIn = q['checkInDate'];
+    if (store.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    /// APPLY DATE FILTER
+    final filtered = store.quotations.where((q) {
+      final DateTime? checkIn = q['checkInDate'] as DateTime?;
       if (checkIn == null) return false;
 
-      if (from != null && checkIn.isBefore(_startOfDay(from!))) {
-        return false;
-      }
-      if (to != null && checkIn.isAfter(_endOfDay(to!))) {
-        return false;
-      }
+      if (from != null && checkIn.isBefore(_startOfDay(from!))) return false;
+      if (to != null && checkIn.isAfter(_endOfDay(to!))) return false;
+
       return true;
     }).toList();
 
@@ -61,7 +61,7 @@ class _QuotationHistoryTabState extends State<QuotationHistoryTab> {
 
         /// TABLE
         Expanded(
-          child: filteredWithIndex.isEmpty
+          child: filtered.isEmpty
               ? const Center(child: Text('No quotations found'))
               : SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
@@ -75,40 +75,37 @@ class _QuotationHistoryTabState extends State<QuotationHistoryTab> {
                       DataColumn(label: Text('Check Out')),
                       DataColumn(label: Text('Actions')),
                     ],
-                    rows: List.generate(filteredWithIndex.length, (i) {
-                      final entry = filteredWithIndex[i];
-                      final int realIndex = entry.key;
-                      final q = entry.value;
+                    rows: List.generate(filtered.length, (i) {
+                      final q = filtered[i];
+                      final String quotationId = q['id'];
+                      final DateTime? checkIn = q['checkInDate'] as DateTime?;
+                      final DateTime? checkOut = q['checkOutDate'] as DateTime?;
 
                       return DataRow(
-                        key: ValueKey(realIndex),
+                        key: ValueKey(quotationId),
                         cells: [
                           DataCell(Text('${i + 1}')),
                           DataCell(Text(q['customerName'] ?? '')),
                           DataCell(Text(q['phone1'] ?? '')),
                           DataCell(Text(q['package'] ?? '')),
-                          DataCell(Text(_fmt(q['checkInDate']))),
-                          DataCell(Text(_fmt(q['checkOutDate']))),
+                          DataCell(Text(
+                              checkIn != null ? DateFormat('dd/MM/yyyy').format(checkIn) : '')),
+                          DataCell(Text(
+                              checkOut != null ? DateFormat('dd/MM/yyyy').format(checkOut) : '')),
                           DataCell(
                             Row(
                               children: [
-                                /// VIEW
                                 IconButton(
                                   icon: const Icon(Icons.visibility),
                                   tooltip: 'View',
                                   onPressed: () {
                                     Navigator.pushNamed(
                                       context,
-                                      '/quotation_preview',
-                                      arguments: {
-                                        ...q,
-                                        'historyIndex': realIndex,
-                                      },
+                                      '/quotation_preview_screen',
+                                      arguments: q,
                                     );
                                   },
                                 ),
-
-                                /// EDIT
                                 IconButton(
                                   icon: const Icon(Icons.edit),
                                   tooltip: 'Edit',
@@ -118,22 +115,18 @@ class _QuotationHistoryTabState extends State<QuotationHistoryTab> {
                                       '/create_quotation',
                                       arguments: {
                                         ...q,
-                                        'historyIndex': realIndex,
+                                        'quotationId': quotationId,
                                       },
                                     );
                                   },
                                 ),
-
-                                /// DELETE WITH CONFIRMATION
-IconButton(
-  icon: const Icon(Icons.delete),
-  tooltip: 'Delete',
-  onPressed: () {
-    _confirmDelete(context, q['historyIndex']);
-  },
-),
-
-                                /// GENERATE BILL
+                                IconButton(
+                                  icon: const Icon(Icons.delete),
+                                  tooltip: 'Delete',
+                                  onPressed: () {
+                                    _confirmDelete(context, quotationId);
+                                  },
+                                ),
                                 IconButton(
                                   icon: const Icon(Icons.receipt_long),
                                   tooltip: 'Generate Bill',
@@ -158,16 +151,10 @@ IconButton(
     );
   }
 
-  /// DATE PICKER BUTTON
-  Widget _dateBox(
-    String label,
-    DateTime? value,
-    Function(DateTime) onPick,
-  ) {
+  /// DATE PICKER
+  Widget _dateBox(String label, DateTime? value, Function(DateTime) onPick) {
     return OutlinedButton(
-      child: Text(
-        value == null ? label : DateFormat('dd/MM/yyyy').format(value),
-      ),
+      child: Text(value == null ? label : DateFormat('dd/MM/yyyy').format(value)),
       onPressed: () async {
         final d = await showDatePicker(
           context: context,
@@ -180,41 +167,33 @@ IconButton(
     );
   }
 
-  Future<void> _confirmDelete(BuildContext context, int index) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: const Text('Delete Quotation'),
-      content: const Text(
-        'Are you sure you want to delete this quotation? '
-        'This action cannot be undone.',
+  /// CONFIRM DELETE
+  Future<void> _confirmDelete(BuildContext context, String quotationId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Quotation'),
+        content: const Text(
+            'Are you sure you want to delete this quotation?\nThis action cannot be undone.'),
+        actions: [
+          TextButton(
+            child: const Text('No'),
+            onPressed: () => Navigator.pop(context, false),
+          ),
+          ElevatedButton(
+            child: const Text('Yes'),
+            onPressed: () => Navigator.pop(context, true),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          child: const Text('No'),
-          onPressed: () => Navigator.pop(context, false),
-        ),
-        ElevatedButton(
-          child: const Text('Yes'),
-          onPressed: () => Navigator.pop(context, true),
-        ),
-      ],
-    ),
-  );
+    );
 
-  if (confirmed == true) {
-    context.read<QuotationHistoryStore>().deleteQuotation(index);
+    if (confirmed == true && context.mounted) {
+      await context.read<QuotationHistoryStore>().deleteQuotation(quotationId);
+    }
   }
-}
 
-
-  /// FORMAT DATE
-  String _fmt(DateTime? d) =>
-      d == null ? '' : DateFormat('dd/MM/yyyy').format(d);
-
-  DateTime _startOfDay(DateTime d) =>
-      DateTime(d.year, d.month, d.day, 0, 0, 0);
-
-  DateTime _endOfDay(DateTime d) =>
-      DateTime(d.year, d.month, d.day, 23, 59, 59);
+  /// DATE HELPERS
+  DateTime _startOfDay(DateTime d) => DateTime(d.year, d.month, d.day);
+  DateTime _endOfDay(DateTime d) => DateTime(d.year, d.month, d.day, 23, 59, 59);
 }
