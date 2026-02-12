@@ -20,6 +20,11 @@ import 'screens/bill_preview_screen.dart';
 import 'screens/bill_history_tab.dart';
 import 'history/bill_history_store.dart';
 
+import 'screens/create_itinerary.dart';
+import 'screens/itinerary_preview_screen.dart';
+import 'history/itinerary_history.dart';
+import 'screens/itinerary_history_tab.dart';
+
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
@@ -87,6 +92,11 @@ class MyApp extends StatelessWidget {
         '/bill_list': (_) => const BillListScreen(),
         '/bill_preview': (_) => const BillPreviewScreen(),
         '/bill_history_tab': (_) => const BillHistoryTab(),
+
+        '/create_itinerary': (_) => const CreateItineraryScreen(),
+        '/itinerary_preview': (_) =>  const ItineraryPreviewScreen(),  
+        '/itinerary_history': (_) => const ItineraryHistoryScreen(),
+        '/itinerary_history_tab': (_) => const ItineraryHistoryTab(docs: [],),
       },
     );
   }

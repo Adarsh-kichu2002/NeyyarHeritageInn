@@ -13,6 +13,8 @@ class BillHistoryTab extends StatefulWidget {
 class _BillHistoryTabState extends State<BillHistoryTab> {
   DateTime? from;
   DateTime? to;
+  
+  get data => null;
 
   @override
   Widget build(BuildContext context) {
@@ -101,10 +103,26 @@ class _BillHistoryTabState extends State<BillHistoryTab> {
                                     );
                                   },
                                 ),
+                                // ✏️ EDIT
+    IconButton(
+  icon: const Icon(Icons.edit),
+  onPressed: () {
+    Navigator.pushNamed(
+      context,
+      '/bill_screen',
+      arguments: {
+        ...b,
+        'isEdit': true,        // ✅ FIXED
+        'billId': b['billId'], // ✅ MUST PASS
+      },
+    );
+  },
+),
+
                                 IconButton(
                                   icon: const Icon(Icons.delete),
                                   onPressed: () =>
-                                      _confirmDelete(context, b['invoiceNo']),
+                                      _confirmDelete(context, b['billId']),
                                 ),
                               ],
                             ),
@@ -119,7 +137,7 @@ class _BillHistoryTabState extends State<BillHistoryTab> {
     );
   }
 
-  Future<void> _confirmDelete(BuildContext context, String invoiceNo) async {
+  Future<void> _confirmDelete(BuildContext context, String billId) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -139,7 +157,7 @@ class _BillHistoryTabState extends State<BillHistoryTab> {
     );
 
     if (ok == true) {
-      context.read<BillHistoryStore>().deleteBill(invoiceNo);
+      context.read<BillHistoryStore>().deleteBill(billId);
     }
   }
 

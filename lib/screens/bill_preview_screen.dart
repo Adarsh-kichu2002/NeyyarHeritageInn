@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -7,23 +8,22 @@ import 'package:printing/printing.dart';
 
 import '../history/bill_history_store.dart';
 
-class BillPreviewScreen extends StatelessWidget {
+class BillPreviewScreen extends StatefulWidget {
   const BillPreviewScreen({super.key});
 
-  Color get green => const Color.fromARGB(255, 52, 191, 59);
+  @override
+  State<BillPreviewScreen> createState() => _BillPreviewScreenState();
+}
+
+class _BillPreviewScreenState extends State<BillPreviewScreen> {
+  final Color green = const Color.fromARGB(255, 52, 191, 59);
+  bool _saving = false;
 
   int _toInt(dynamic v) => int.tryParse(v?.toString() ?? '') ?? 0;
 
   String _fmtDate(dynamic d) {
-    if (d == null) return '';
     if (d is DateTime) {
       return DateFormat('dd/MM/yyyy').format(d);
-    }
-    if (d is String) {
-      final parsed = DateTime.tryParse(d);
-      if (parsed != null) {
-        return DateFormat('dd/MM/yyyy').format(parsed);
-      }
     }
     return '';
   }
@@ -64,6 +64,8 @@ class BillPreviewScreen extends StatelessWidget {
     );
   }
 
+  /// ---------------- UI ----------------
+
   Widget _header(Map<String, dynamic> data) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -76,32 +78,28 @@ class BillPreviewScreen extends StatelessWidget {
             fit: BoxFit.contain,
           ),
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                'Invoice: ${data['invoiceNo'] ?? ''}',
-                style: TextStyle(color: green, fontWeight: FontWeight.bold),
-              ),
-              Text(
-                'Date: ${_fmtDate(data['checkOutDate'])}',
-                style: TextStyle(color: green),
-              ),
-            ],
-          ),
+        const Spacer(),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              'Invoice: ${data['invoiceNo']}',
+              style: TextStyle(color: green, fontWeight: FontWeight.bold),
+            ),
+            Text(
+              'Date: ${_fmtDate(data['checkOutDate'])}',
+              style: TextStyle(color: green),
+            ),
+          ],
         ),
       ],
     );
   }
 
-  Widget _receiptTitle() {
-    return Text(
-      'RECEIPT',
-      style: TextStyle(color: green, fontSize: 20, fontWeight: FontWeight.bold),
-    );
-  }
+  Widget _receiptTitle() => Text(
+        'RECEIPT',
+        style: TextStyle(color: green, fontSize: 20, fontWeight: FontWeight.bold),
+      );
 
   Widget _partyInfo(Map<String, dynamic> data) {
     return Row(
@@ -124,7 +122,7 @@ class BillPreviewScreen extends StatelessWidget {
   }
 
   Widget _itemsTable(Map<String, dynamic> data) {
-    final List items = data['items'] ?? [];
+    final items = data['items'] as List? ?? [];
 
     return Table(
       border: TableBorder.all(color: Colors.grey),
@@ -177,11 +175,11 @@ class BillPreviewScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              _totalRow('Total', _toInt(data['subtotal'])),
-              _totalRow('GST (5%)', _toInt(data['gst'])),
-              _totalRow('Advance', _toInt(data['advance'])),
+              _totalRow('Total', data['subtotal']),
+              _totalRow('GST (5%)', data['gst']),
+              _totalRow('Advance', data['advance']),
               const Divider(),
-              _totalRow('Balance', _toInt(data['balance']), bold: true),
+              _totalRow('Balance', data['balance'], bold: true),
             ],
           ),
         ),
@@ -189,12 +187,13 @@ class BillPreviewScreen extends StatelessWidget {
     );
   }
 
-  Widget _totalRow(String label, int value, {bool bold = false}) {
+  Widget _totalRow(String label, dynamic value, {bool bold = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: TextStyle(fontWeight: bold ? FontWeight.bold : null)),
-        Text('₹$value',
+        Text(label,
+            style: TextStyle(fontWeight: bold ? FontWeight.bold : null)),
+        Text('₹${_toInt(value)}',
             style: TextStyle(fontWeight: bold ? FontWeight.bold : null)),
       ],
     );
@@ -206,7 +205,9 @@ class BillPreviewScreen extends StatelessWidget {
       padding: const EdgeInsets.all(8),
       child: const Row(
         children: [
-          Expanded(child: Text('9656763391', style: TextStyle(color: Colors.white))),
+          Expanded(
+              child:
+                  Text('9656763391', style: TextStyle(color: Colors.white))),
           Expanded(
               child: Text('neyyarheritageinn@gmail.com',
                   textAlign: TextAlign.center,
@@ -220,73 +221,284 @@ class BillPreviewScreen extends StatelessWidget {
     );
   }
 
-  Widget _actions(BuildContext context, Map<String, dynamic> data) {
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        children: [
-          Expanded(
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.save),
-              label: const Text('Save'),
-              onPressed: data['_saved'] == true
-                  ? null
-                  : () async {
-                      data['_saved'] = true;
-                      await context.read<BillHistoryStore>().addBill(data);
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Bill saved')),
-                      );
-                    },
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.download),
-              label: const Text('Download'),
-              onPressed: () => _downloadPdf(data),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  /// ---------------- ACTIONS ----------------
 
+ Widget _actions(BuildContext context, Map<String, dynamic> data) {
+  return Padding(
+    padding: const EdgeInsets.all(12),
+    child: Row(
+      children: [
+        Expanded(
+          child: ElevatedButton.icon(
+            icon: const Icon(Icons.save),
+            label: Text(_saving ? 'Saving...' : 'Save & Download'),
+            onPressed: _saving
+                ? null
+                : () async {
+                    setState(() => _saving = true);
+
+                    // ✅ CRITICAL FIX
+                    final billId = data['billId'] ??
+                        DateTime.now().millisecondsSinceEpoch.toString();
+
+                    final finalData = {
+                      ...data,
+                      'billId': billId,
+                    };
+
+                    await context
+                        .read<BillHistoryStore>()
+                        .addOrUpdateBill(finalData);
+
+                    if (!mounted) return;
+
+                    setState(() => _saving = false);
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Bill saved successfully'),
+                      ),
+                    );
+
+                    await _downloadPdf(finalData);
+                  },
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+    
+    // PDF Generation
   Future<void> _downloadPdf(Map<String, dynamic> data) async {
-    final font =
-        pw.Font.ttf(await rootBundle.load('assets/fonts/Roboto-Regular.ttf'));
+  final fontRegular =
+      pw.Font.ttf(await rootBundle.load('assets/fonts/Roboto-Regular.ttf'));
+  final fontBold =
+      pw.Font.ttf(await rootBundle.load('assets/fonts/Roboto-Bold.ttf'));
 
-    final logo = (await rootBundle.load('assets/images/neyyar_logo.png'))
-        .buffer
-        .asUint8List();
+  final logoBytes = (await rootBundle.load('assets/images/neyyar_logo.png'))
+      .buffer
+      .asUint8List();
 
-    final pdf = pw.Document();
+  final pdf = pw.Document();
 
-    pdf.addPage(
-      pw.Page(
-        theme: pw.ThemeData.withFont(base: font),
-        build: (_) => pw.Column(
+  final green = PdfColor.fromInt(const Color.fromARGB(255, 52, 191, 59).value);
+
+  final items = data['items'] as List? ?? [];
+
+  pw.TextStyle body = const pw.TextStyle(fontSize: 12, height: 1.4);
+  pw.TextStyle bold =
+      pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, height: 1.4);
+
+  pdf.addPage(
+    pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(24),
+      theme: pw.ThemeData.withFont(base: fontRegular, bold: fontBold),
+      build: (context) => [
+        /// HEADER
+        pw.Row(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            pw.Image(pw.MemoryImage(logo), height: 80),
-            pw.Text('Invoice: ${data['invoiceNo']}'),
-            pw.Text('Date: ${_fmtDate(data['checkOutDate'])}'),
-            pw.SizedBox(height: 12),
-            ...data['items'].map<pw.Widget>((i) {
+            pw.Image(pw.MemoryImage(logoBytes), height: 90),
+            pw.Spacer(),
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.end,
+              children: [
+                pw.Text(
+                  'Invoice: ${data['invoiceNo'] ?? ''}',
+                  style: pw.TextStyle(
+                      color: green,
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 13),
+                ),
+                pw.Text(
+                  'Date: ${_fmtDate(data['checkOutDate'])}',
+                  style: pw.TextStyle(color: green, fontSize: 12),
+                ),
+              ],
+            ),
+          ],
+        ),
+
+        pw.SizedBox(height: 16),
+
+        /// RECEIPT TITLE
+        pw.Center(
+          child: pw.Text(
+            'RECEIPT',
+            style: pw.TextStyle(
+              color: green,
+              fontSize: 20,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+        ),
+
+        pw.SizedBox(height: 16),
+
+        /// PARTY INFO
+        pw.Row(
+          children: [
+            pw.Expanded(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(data['customerName'] ?? '', style: bold),
+                  pw.Text('Mob: ${data['phone1'] ?? ''}', style: body),
+                ],
+              ),
+            ),
+            pw.Expanded(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.end,
+                children: [
+                  pw.Text('Check In: ${_fmtDate(data['checkInDate'])}',
+                      style: body),
+                  pw.Text('Check Out: ${_fmtDate(data['checkOutDate'])}',
+                      style: body),
+                ],
+              ),
+            ),
+          ],
+        ),
+
+        pw.SizedBox(height: 20),
+
+        /// ITEMS TABLE
+        pw.Table(
+          border: pw.TableBorder.all(color: PdfColors.grey),
+          columnWidths: const {
+            0: pw.FlexColumnWidth(3),
+            1: pw.FlexColumnWidth(2),
+            2: pw.FlexColumnWidth(2),
+            3: pw.FlexColumnWidth(2),
+          },
+          children: [
+            pw.TableRow(
+              decoration: pw.BoxDecoration(color: green),
+              children: [
+                _pdfHeaderCell('Description'),
+                _pdfHeaderCell('Price'),
+                _pdfHeaderCell('Qty'),
+                _pdfHeaderCell('Total'),
+              ],
+            ),
+            ...items.map((i) {
               final qty = _toInt(i['qty']);
               final price = _toInt(i['price']);
-              return pw.Text('${i['name']} — ₹$price x $qty');
+              return pw.TableRow(
+                children: [
+                  _pdfCell(i['name'] ?? ''),
+                  _pdfCell('₹$price'),
+                  _pdfCell('$qty'),
+                  _pdfCell('₹${qty * price}'),
+                ],
+              );
             }),
           ],
         ),
-      ),
-    );
 
-    await Printing.layoutPdf(onLayout: (_) => pdf.save());
-  }
+        pw.SizedBox(height: 20),
+
+        /// SUMMARY + NOTES
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Expanded(
+              flex: 3,
+              child: pw.Text(
+                'Thank you for choosing us.\n'
+                'We look forward to hosting you again.\n'
+                'Best Regards,\n'
+                'Neyyar Heritage Inn.',
+                style: body,
+              ),
+            ),
+            pw.Expanded(
+              flex: 2,
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.end,
+                children: [
+                  _pdfTotalRow('Total', data['subtotal'], body),
+                  _pdfTotalRow('GST (5%)', data['gst'], body),
+                  _pdfTotalRow('Advance', data['advance'], body),
+                  pw.Divider(),
+                  _pdfTotalRow('Balance', data['balance'], bold),
+                ],
+              ),
+            ),
+          ],
+        ),
+
+        pw.SizedBox(height: 24),
+
+        /// FOOTER
+        pw.Container(
+          color: green,
+          padding: const pw.EdgeInsets.all(10),
+          child: pw.Row(
+            children: [
+              pw.Expanded(
+                child: pw.Text(
+                  '9656763391',
+                  style: const pw.TextStyle(color: PdfColors.white),
+                ),
+              ),
+              pw.Expanded(
+                child: pw.Text(
+                  'neyyarheritageinn@gmail.com',
+                  textAlign: pw.TextAlign.center,
+                  style: const pw.TextStyle(color: PdfColors.white),
+                ),
+              ),
+              pw.Expanded(
+                child: pw.Text(
+                  'www.neyyarheritage.in',
+                  textAlign: pw.TextAlign.right,
+                  style: const pw.TextStyle(color: PdfColors.white),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+
+  await Printing.layoutPdf(onLayout: (_) => pdf.save());
 }
+}
+
+pw.Widget _pdfHeaderCell(String text) {
+  return pw.Padding(
+    padding: const pw.EdgeInsets.all(8),
+    child: pw.Text(
+      text,
+      style: pw.TextStyle(
+          color: PdfColors.white, fontWeight: pw.FontWeight.bold),
+    ),
+  );
+}
+
+pw.Widget _pdfCell(String text) {
+  return pw.Padding(
+    padding: const pw.EdgeInsets.all(8),
+    child: pw.Text(text),
+  );
+}
+
+pw.Widget _pdfTotalRow(String label, dynamic value, pw.TextStyle style) {
+  return pw.Row(
+    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+    children: [
+      pw.Text(label, style: style),
+      pw.Text('₹${int.tryParse(value?.toString() ?? '') ?? 0}', style: style),
+    ],
+  );
+}
+
 
 class _HeaderCell extends StatelessWidget {
   final String text;
@@ -296,8 +508,9 @@ class _HeaderCell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(8),
-      child:
-          Text(text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      child: Text(text,
+          style: const TextStyle(
+              color: Colors.white, fontWeight: FontWeight.bold)),
     );
   }
 }

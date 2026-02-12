@@ -6,9 +6,9 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
-import 'package:share_plus/share_plus.dart';
 
 class QuotationPreviewScreen extends StatefulWidget {
   const QuotationPreviewScreen({super.key});
@@ -198,53 +198,55 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen> {
 
             /// SAVE
             SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.save),
-                label: const Text('Save'),
-                onPressed: () async {
-                  final store = context.read<QuotationHistoryStore>();
+  width: double.infinity,
+  child: ElevatedButton.icon(
+    icon: const Icon(Icons.save),
+    label: const Text('Save & Download'),
+    onPressed: () async {
+      final store = context.read<QuotationHistoryStore>();
 
-                  String? timeToString(dynamic t) {
-                    if (t == null) return null;
-                    if (t is TimeOfDay) return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-                    return t.toString();
-                  }
+      String? timeToString(dynamic t) {
+        if (t == null) return null;
+        if (t is TimeOfDay) {
+          return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+        }
+        return t.toString();
+      }
 
-                  final Map<String, dynamic> finalData = {
-                    ...data,
-                    'checkInTime': timeToString(data['checkInTime']),
-                    'checkOutTime': timeToString(data['checkOutTime']),
-                    'savedAt': DateTime.now(),
-                  };
+      /// 🔥 BUILD FINAL DATA SAFELY
+      final Map<String, dynamic> finalData = {
+        ...data,
+        'checkInTime': timeToString(data['checkInTime']),
+        'checkOutTime': timeToString(data['checkOutTime']),
+        if (data['checkInDate'] is DateTime)
+          'checkInDate': data['checkInDate'],
+        if (data['checkOutDate'] is DateTime)
+          'checkOutDate': data['checkOutDate'],
+      };
 
-                  /// UPDATE (EDIT MODE)
-                  if (data.containsKey('quotationId')) {
-                    await store.updateQuotation(data['quotationId'], finalData);
-                  }
-                  /// ADD (NEW QUOTATION)
-                  else {
-                    await store.addQuotation(finalData);
-                  }
+      /// 🔥 SAVE / UPDATE
+      if (data['mode'] == 'edit' && data['quotationId'] != null) {
+        await store.updateQuotation(
+          data['quotationId'],
+          finalData,
+        );
+      } else {
+        await store.addQuotation(finalData);
+      }
 
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Quotation saved successfully')),
-                  );
+      if (!mounted) return;
 
-                  Navigator.pop(context);
-                },
-              ),
-            ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Quotation saved successfully')),
+      );
 
-            /// DOWNLOAD PDF
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.download),
-                label: const Text('Download PDF'),
-                onPressed: _downloadPdf,
-              ),
-            ),
+      /// ✅ AUTO PRINT / DOWNLOAD (NOT SHARE)
+      await _downloadPdf();
+
+      Navigator.pop(context);
+    },
+  ),
+),
           ],
         ),
       ),
@@ -252,24 +254,32 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen> {
   }
 
   /// PDF GENERATION
-  Future<void> _downloadPdf() async {
+Future<void> _downloadPdf() async {
   final pdf = pw.Document();
 
-  /// Load Unicode font (₹, • supported)
-  final pw.Font font = pw.Font.ttf(await rootBundle.load('assets/fonts/Roboto-Regular.ttf'));
+  /// Load fonts
+  final fontRegular =
+      pw.Font.ttf(await rootBundle.load('assets/fonts/Roboto-Regular.ttf'));
+  final fontBold =
+      pw.Font.ttf(await rootBundle.load('assets/fonts/Roboto-Bold.ttf'));
 
   /// Load logo
-  final ByteData logoData = await rootBundle.load('assets/images/neyyar_logo.png');
-  final Uint8List logoBytes = logoData.buffer.asUint8List();
+  final logoData = await rootBundle.load('assets/images/neyyar_logo.png');
+  final logoBytes = logoData.buffer.asUint8List();
 
   final List rooms = data['rooms'] as List? ?? [];
   final List facilities = data['facilities'] as List? ?? [];
+
+  /// Common styles (MATCH PREVIEW)
+  const bodyStyle = pw.TextStyle(fontSize: 14, height: 1.3);
+  final boldStyle =
+      pw.TextStyle(fontSize: 14, height: 1.3, fontWeight: pw.FontWeight.bold);
 
   pdf.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(24),
-      theme: pw.ThemeData.withFont(base: font, bold: font),
+      theme: pw.ThemeData.withFont(base: fontRegular, bold: fontBold),
       build: (context) => [
         /// HEADER
         pw.Row(
@@ -285,10 +295,13 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen> {
                   style: pw.TextStyle(
                     fontSize: 20,
                     fontWeight: pw.FontWeight.bold,
-                    color: PdfColors.green700,
+                    color: PdfColors.green800,
                   ),
                 ),
-                pw.Text('Date: ${DateFormat('dd/MM/yyyy').format(DateTime.now())}'),
+                pw.Text(
+                  'Date : ${DateFormat('dd/MM/yyyy').format(DateTime.now())}',
+                  style: bodyStyle,
+                ),
               ],
             ),
           ],
@@ -298,47 +311,43 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen> {
         pw.Divider(),
 
         /// CUSTOMER DETAILS
-        pw.Text('To,'),
-        pw.Text(data['customerName'] ?? '', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-        pw.Text('Mob: ${data['phone1'] ?? ''}'),
+        pw.Text('To,', style: bodyStyle),
+        pw.Text(data['customerName'] ?? '', style: boldStyle),
+        pw.Text('Mob: ${data['phone1'] ?? ''}', style: bodyStyle),
         if (data['phone2'] != null && data['phone2'].toString().isNotEmpty)
-          pw.Text('Alt Mob: ${data['phone2']}'),
+          pw.Text('Alt Mob: ${data['phone2']}', style: bodyStyle),
         if (data['address'] != null && data['address'].toString().isNotEmpty)
-          pw.Text(data['address']),
+          pw.Text(data['address'], style: bodyStyle),
 
         pw.SizedBox(height: 16),
 
-        /// DESCRIPTION
+        /// DESCRIPTION (MATCH PREVIEW PARAGRAPH)
         pw.RichText(
           text: pw.TextSpan(
-            style: const pw.TextStyle(fontSize: 11),
+            style: bodyStyle,
             children: [
               const pw.TextSpan(text: 'We appreciate your interest in '),
               pw.TextSpan(
-                text: 'Neyyar Heritage Inn - Home Stay',
-                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-              ),
+                  text: 'Neyyar Heritage Inn - Home Stay',
+                  style: boldStyle),
               const pw.TextSpan(text: ' for your upcoming '),
-              pw.TextSpan(
-                text: data['package'] ?? '',
-                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-              ),
+              pw.TextSpan(text: data['package'] ?? '', style: boldStyle),
               pw.TextSpan(
                 text:
                     ' (Check In: ${_date(data['checkInDate'])} ${_time(data['checkInTime'])}, '
                     'Check Out: ${_date(data['checkOutDate'])} ${_time(data['checkOutTime'])}).',
-                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                style: boldStyle,
               ),
               const pw.TextSpan(text: '\n\nAt '),
               pw.TextSpan(
-                text: 'Neyyar Heritage Inn - Home Stay, ',
-                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-              ),
+                  text: 'Neyyar Heritage Inn - Home Stay, ',
+                  style: boldStyle),
               const pw.TextSpan(
-                  text:
-                      'we are committed to providing our guests with exceptional experiences '
+                text:
+                    'we are committed to providing our guests with exceptional experiences '
                       'that create lasting memories. Please review the quotation and feel free '
-                      'to contact us for any clarification.'),
+                      'to contact us for any clarification.',
+              ),
             ],
           ),
         ),
@@ -347,17 +356,34 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen> {
 
         /// TABLE HEADER
         pw.Container(
-          padding: const pw.EdgeInsets.all(8),
+          padding: const pw.EdgeInsets.symmetric(vertical: 10, horizontal: 8),
           decoration: pw.BoxDecoration(
-            color: PdfColors.green700,
-            borderRadius: pw.BorderRadius.circular(6),
+            color: PdfColors.green800,
+            borderRadius: pw.BorderRadius.circular(8),
           ),
           child: pw.Row(
             children: [
-              pw.Expanded(flex: 3, child: _whiteText('Item Description')),
-              pw.Expanded(child: _whiteText('Qty')),
-              pw.Expanded(child: _whiteText('Price')),
-              pw.Expanded(child: _whiteText('Total')),
+              pw.Expanded(
+                  flex: 3,
+                  child: pw.Text('Item Description',
+                      style: pw.TextStyle(
+                          color: PdfColors.white,
+                          fontWeight: pw.FontWeight.bold))),
+              pw.Expanded(
+                  child: pw.Text('Qty',
+                      style: pw.TextStyle(
+                          color: PdfColors.white,
+                          fontWeight: pw.FontWeight.bold))),
+              pw.Expanded(
+                  child: pw.Text('Price',
+                      style: pw.TextStyle(
+                          color: PdfColors.white,
+                          fontWeight: pw.FontWeight.bold))),
+              pw.Expanded(
+                  child: pw.Text('Total',
+                      style: pw.TextStyle(
+                          color: PdfColors.white,
+                          fontWeight: pw.FontWeight.bold))),
             ],
           ),
         ),
@@ -365,33 +391,45 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen> {
         /// ROOM ROWS
         ...rooms.where((r) => r['selected'] == true).map(
               (r) => pw.Padding(
-                padding: const pw.EdgeInsets.symmetric(vertical: 6),
+                padding:
+                    const pw.EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                 child: pw.Row(
                   children: [
-                    pw.Expanded(flex: 3, child: pw.Text(r['name'] ?? '')),
-                    pw.Expanded(child: pw.Text('${r['qty'] ?? 0}')),
-                    pw.Expanded(child: pw.Text('₹${r['price'] ?? 0}')),
                     pw.Expanded(
-                        child: pw.Text('₹${(r['price'] ?? 0) * (r['qty'] ?? 0)}')),
+                        flex: 3,
+                        child: pw.Text(r['name'] ?? '', style: bodyStyle)),
+                    pw.Expanded(
+                        child: pw.Text('${r['qty'] ?? 0}', style: bodyStyle)),
+                    pw.Expanded(
+                        child:
+                            pw.Text('₹${r['price'] ?? 0}', style: bodyStyle)),
+                    pw.Expanded(
+                        child: pw.Text(
+                            '₹${(r['price'] ?? 0) * (r['qty'] ?? 0)}',
+                            style: bodyStyle)),
                   ],
                 ),
               ),
             ),
 
-        pw.SizedBox(height: 8),
+        pw.SizedBox(height: 12),
 
         /// EXTRA PERSONS
         if ((data['extraTotal'] ?? 0) > 0)
           pw.Text(
-            'Extra Persons (${data['extraPersons'] ?? 0} x ${data['extraPersonPrice'] ?? 0}) '
+            'Extra Persons (${data['extraPersons']} x ${data['extraPersonPrice']}) '
             '₹${data['extraTotal']}',
+            style: bodyStyle,
           ),
 
         /// DISCOUNT
         if ((data['discount'] ?? 0) > 0)
           pw.Text(
-            'Discount - ₹${data['discount']}',
-            style: const pw.TextStyle(color: PdfColors.red),
+            'Discount  -₹${data['discount']}',
+            style: const pw.TextStyle(
+                fontSize: 14,
+                color: PdfColors.red,
+                height: 1.3),
           ),
 
         pw.SizedBox(height: 12),
@@ -399,14 +437,22 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen> {
         /// PAX
         pw.Text(
           'Pax -- ${data['adult'] ?? 0}+${data['children'] ?? 0}+${data['child'] ?? 0} = ${data['totalPax'] ?? 0}',
-          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+          style: boldStyle,
         ),
 
         pw.SizedBox(height: 12),
 
         /// FACILITIES
-        pw.Text('Facilities', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-        ...facilities.map((f) => pw.Text('• $f')),
+        pw.Text('Facilities', style: boldStyle),
+        ...facilities.map(
+          (f) => pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text('• ', style: bodyStyle),
+              pw.Expanded(child: pw.Text(f, style: bodyStyle)),
+            ],
+          ),
+        ),
 
         pw.Divider(),
 
@@ -415,23 +461,29 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen> {
           alignment: pw.Alignment.centerRight,
           child: pw.Text(
             'Total: ₹${data['total'] ?? 0}',
-            style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+            style: pw.TextStyle(
+                fontSize: 18,
+                fontWeight: pw.FontWeight.bold,
+                height: 1.3),
           ),
         ),
 
-        pw.SizedBox(height: 20),
+        pw.SizedBox(height: 24),
 
         /// FOOTER
         pw.Container(
           width: double.infinity,
-          padding: const pw.EdgeInsets.all(10),
-          color: PdfColors.green700,
+          padding:
+              const pw.EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+          color: PdfColors.green800,
           child: pw.Column(
             children: [
               pw.Text('+91 9656763391 | homestay.neyyar@gmail.com',
-                  style: const pw.TextStyle(color: PdfColors.white)),
+                  style:
+                      const pw.TextStyle(color: PdfColors.white, fontSize: 12)),
               pw.Text('www.neyyarheritage.in',
-                  style: const pw.TextStyle(color: PdfColors.white)),
+                  style:
+                      const pw.TextStyle(color: PdfColors.white, fontSize: 12)),
             ],
           ),
         ),
@@ -440,15 +492,14 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen> {
   );
 
   /// SAVE FILE
-  final Directory dir = await getApplicationDocumentsDirectory();
-  final File file = File(
+  final dir = await getApplicationDocumentsDirectory();
+  final file = File(
       '${dir.path}/Quotation_${DateTime.now().millisecondsSinceEpoch}.pdf');
   await file.writeAsBytes(await pdf.save());
 
-  /// SHARE
-  await Share.shareXFiles([XFile(file.path)],
-      text: 'Quotation - Neyyar Heritage Inn');
+  await Printing.layoutPdf(onLayout: (_) => pdf.save());
 }
+
 
 /// HELPER
 pw.Text _whiteText(String text) {

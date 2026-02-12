@@ -10,6 +10,7 @@ class BillScreen extends StatefulWidget {
 
 class _BillScreenState extends State<BillScreen> {
   Map<String, dynamic> billData = {};
+  bool isEdit = false;
 
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
@@ -23,35 +24,60 @@ class _BillScreenState extends State<BillScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-
     if (_initialized) return;
     _initialized = true;
 
-    billData =
-        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ??
-            {};
+    final args =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
 
+    billData = args ?? {};
+
+    // ✅ Correct edit flag
+    isEdit = billData['isEdit'] == true;
+
+    // ✅ Preserve billId if editing
+    if (isEdit && billData['billId'] != null) {
+      billData['billId'] = billData['billId'];
+    }
+
+    // =========================
+    // TEXT FIELD INITIALIZATION
+    // =========================
     _nameCtrl.text = billData['customerName'] ?? '';
     _phoneCtrl.text = billData['phone1'] ?? '';
 
-    /// INVOICE NUMBER
     _invoiceCtrl.text =
         billData['invoiceNo']?.toString() ??
             DateTime.now().millisecondsSinceEpoch.toString();
 
-    /// SAFE DATE INIT
-    checkIn = billData['checkInDate'];
-    checkOut = billData['checkOutDate'];
+    // =========================
+    // SAFE DATE HANDLING
+    // =========================
+    checkIn = _parseDate(billData['checkInDate']);
+    checkOut = _parseDate(billData['checkOutDate']);
 
-    /// If both null (new bill), default logically
     checkIn ??= DateTime.now();
     checkOut ??= DateTime.now().add(const Duration(days: 1));
+  }
+
+  DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+
+    if (value is DateTime) return value;
+
+    if (value is String) {
+      return DateTime.tryParse(value);
+    }
+
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Create Bill')),
+      appBar: AppBar(
+        title: Text(isEdit ? 'Edit Bill' : 'Create Bill'),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -67,7 +93,8 @@ class _BillScreenState extends State<BillScreen> {
             ),
             TextField(
               controller: _invoiceCtrl,
-              decoration: const InputDecoration(labelText: 'Invoice Number'),
+              decoration:
+                  const InputDecoration(labelText: 'Invoice Number'),
               keyboardType: TextInputType.number,
             ),
 
@@ -101,6 +128,8 @@ class _BillScreenState extends State<BillScreen> {
                     '/bill_list',
                     arguments: {
                       ...billData,
+                      'isEdit': isEdit,
+                      'billId': billData['billId'], // ✅ preserve
                       'customerName': _nameCtrl.text.trim(),
                       'phone1': _phoneCtrl.text.trim(),
                       'invoiceNo': _invoiceCtrl.text.trim(),

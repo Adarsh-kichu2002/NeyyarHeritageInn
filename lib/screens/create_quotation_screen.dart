@@ -11,8 +11,43 @@ class CreateQuotationScreen extends StatefulWidget {
 class _CreateQuotationScreenState extends State<CreateQuotationScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  late String mode;
+Map<String, dynamic>? editData;
+String? quotationId;
+bool isEdit = false;
+
+  String mode = 'create';
   late Map<String, dynamic> data;
+  
+  List<dynamic> rooms = [];
+  List<dynamic> facilities = [];
+
+  DateTime? _tsToDate(dynamic value) {
+  if (value == null) return null;
+  if (value is DateTime) return value;
+
+  // Firestore Timestamp
+  if (value.runtimeType.toString() == 'Timestamp') {
+    return value.toDate();
+  }
+
+  return null;
+}
+
+  TimeOfDay? _stringToTime(dynamic value) {
+  if (value == null) return null;
+
+  if (value is TimeOfDay) return value;
+
+  if (value is String && value.contains(':')) {
+    final parts = value.split(':');
+    return TimeOfDay(
+      hour: int.parse(parts[0]),
+      minute: int.parse(parts[1]),
+    );
+  }
+
+  return null;
+}
 
   String _selectedPackage = 'Day Out Package';
   final List<String> _packages = [
@@ -91,27 +126,54 @@ class _CreateQuotationScreenState extends State<CreateQuotationScreen> {
       time == null ? '' : time.format(context);
   
   
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
+@override
+void didChangeDependencies() {
+  super.didChangeDependencies();
 
-    final args =
-        ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
+  final args = ModalRoute.of(context)?.settings.arguments;
 
-    mode = args?['mode'] ?? 'create';
-    data = args?['data'] ?? {};
+  if (args != null && args is Map<String, dynamic>) {
+    mode = 'edit';
+    editData = args;
+    quotationId = args['id']; // 🔥 VERY IMPORTANT
+    _fillFormForEdit();
+  } else {
+    mode = 'create';
+  }
+}
 
-    if (mode == 'edit') {
-      _prefillFields();
+
+   void _fillFormForEdit() {
+  if (editData == null) return;
+
+  _nameController.text = editData!['customerName'] ?? '';
+  _phone1Controller.text = editData!['phone1'] ?? '';
+  _phone2Controller.text = editData!['phone2'] ?? '';
+  _addressController.text = editData!['address'] ?? '';
+
+  final savedPackage = editData!['package'] ?? '';
+  if (_packages.contains(savedPackage)) {
+      _selectedPackage = savedPackage;
+    } else {
+      _selectedPackage = 'Add New Package';
+      _customPackageController.text = savedPackage;
     }
-  }
 
-  void _prefillFields() {
-    _nameController.text = data['customerName'] ?? '';
-    _phone1Controller.text = data['phone1'] ?? '';
-    // prefill all other fields
-  }
-      
+  rooms = List.from(editData!['rooms'] ?? []);
+  facilities = List.from(editData!['facilities'] ?? []);
+
+  _checkInDate = _tsToDate(editData!['checkInDate']);
+  _checkOutDate = _tsToDate(editData!['checkOutDate']);
+
+  _checkInTime = _stringToTime(editData!['checkInTime']);
+  _checkOutTime = _stringToTime(editData!['checkOutTime']);
+
+  _adultController.text = editData!['adult']?.toString() ?? '0';
+  _childrenController.text = editData!['children']?.toString() ?? '0';
+  _childController.text = editData!['child']?.toString() ?? '0';
+
+  setState(() {});
+}
 
   @override
   Widget build(BuildContext context) {
@@ -130,44 +192,46 @@ class _CreateQuotationScreenState extends State<CreateQuotationScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 /// PACKAGE DROPDOWN
-                DropdownButtonFormField<String>(
-                  value: _selectedPackage,
-                  decoration: const InputDecoration(
-                    labelText: 'Package',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: _packages
-                      .map(
-                        (e) => DropdownMenuItem(
-                          value: e,
-                          child: Text(e),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedPackage = value!;
-                      if (_selectedPackage == 'Day Out Package' &&
-                          _checkInDate != null) {
-                        _checkOutDate = _checkInDate;
-                      }
-                    });
-                  },
+               DropdownButtonFormField<String>(
+                value: _packages.contains(_selectedPackage)
+                    ? _selectedPackage
+                    : null,
+                decoration: const InputDecoration(
+                  labelText: 'Package',
+                  border: OutlineInputBorder(),
                 ),
-
-                if (_selectedPackage == 'Add New Package')
-                  Padding(
-                    padding: const EdgeInsets.only(top: 16),
-                    child: TextFormField(
-                      controller: _customPackageController,
-                      decoration: const InputDecoration(
-                        labelText: 'Enter Package Name',
-                        border: OutlineInputBorder(),
+                items: _packages
+                    .map(
+                      (e) => DropdownMenuItem(
+                        value: e,
+                        child: Text(e),
                       ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedPackage = value!;
+                    if (_selectedPackage == 'Day Out Package' &&
+                        _checkInDate != null) {
+                      _checkOutDate = _checkInDate;
+                    }
+                  });
+                },
+              ),
+
+              if (_selectedPackage == 'Add New Package')
+                Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: TextFormField(
+                    controller: _customPackageController,
+                    decoration: const InputDecoration(
+                      labelText: 'Enter Package Name',
+                      border: OutlineInputBorder(),
                     ),
                   ),
+                ),
 
-                const SizedBox(height: 20),
+              const SizedBox(height: 24),
 
                 /// CHECK IN / OUT
                 Row(
@@ -252,26 +316,31 @@ class _CreateQuotationScreenState extends State<CreateQuotationScreen> {
   onPressed: () {
     if (_formKey.currentState!.validate()) {
       Navigator.pushNamed(
-        context,
-        '/room_select_screen',
-        arguments: {
-          'package': _selectedPackage == 'Add New Package'
-              ? _customPackageController.text
-              : _selectedPackage,
-          'checkInDate': _checkInDate,
-          'checkOutDate': _checkOutDate,
-          'checkInTime': _checkInTime,
-          'checkOutTime': _checkOutTime,
-          'customerName': _nameController.text,
-          'phone1': _phone1Controller.text,
-          'phone2': _phone2Controller.text,
-          'address': _addressController.text,
-          'adult': _adultController.text,
-          'children': _childrenController.text,
-          'child': _childController.text,
-          'totalPax': totalPax,
-        },
-      );
+  context,
+  '/room_select_screen',
+  arguments: {
+    'mode': mode,
+    'quotationId': quotationId,
+    'package': _selectedPackage == 'Add New Package'
+        ? _customPackageController.text
+        : _selectedPackage,
+    'checkInDate': _checkInDate,
+    'checkOutDate': _checkOutDate,
+    'checkInTime': _checkInTime,
+    'checkOutTime': _checkOutTime,
+    'customerName': _nameController.text,
+    'phone1': _phone1Controller.text,
+    'phone2': _phone2Controller.text,
+    'address': _addressController.text,
+    'adult': _adultController.text,
+    'children': _childrenController.text,
+    'child': _childController.text,
+    'totalPax': totalPax,
+    'rooms': rooms,
+    'facilities': facilities,
+  },
+);
+
     }
   },
   child: const Text('Next'),

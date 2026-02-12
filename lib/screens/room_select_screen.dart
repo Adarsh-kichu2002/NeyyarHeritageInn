@@ -10,7 +10,7 @@ class RoomSelectScreen extends StatefulWidget {
 class _RoomSelectScreenState extends State<RoomSelectScreen> {
   late Map<String, dynamic> quotationData;
 
-  /// ROOMS (editable)
+  /// ROOMS
   late List<Map<String, dynamic>> rooms;
 
   /// EXTRA PERSONS
@@ -35,49 +35,51 @@ class _RoomSelectScreenState extends State<RoomSelectScreen> {
   bool _initialized = false;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
+void didChangeDependencies() {
+  super.didChangeDependencies();
+  if (_initialized) return;
 
-    if (_initialized) return;
+  quotationData =
+      ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ?? {};
 
-    quotationData =
-        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ??
-            {};
+  final isEdit = quotationData['mode'] == 'edit';
 
-    /// LOAD ROOMS (EDIT OR NEW)
-    rooms = quotationData['rooms'] != null
-        ? List<Map<String, dynamic>>.from(
-            quotationData['rooms'].map((r) => Map<String, dynamic>.from(r)))
-        : [
-            {'name': 'AC Suite Room', 'price': 3500, 'qty': 1, 'selected': false},
-            {'name': 'Hut', 'price': 2500, 'qty': 1, 'selected': false},
-            {'name': 'Non-AC Room', 'price': 2000, 'qty': 1, 'selected': false},
-          ];
+  /// ROOMS
+  rooms = isEdit && quotationData['rooms'] != null
+      ? List<Map<String, dynamic>>.from(
+          quotationData['rooms'].map((r) => Map<String, dynamic>.from(r)))
+      : [
+          {'name': 'AC Suite Room', 'price': 3500, 'qty': 1, 'selected': false},
+          {'name': 'Hut', 'price': 2500, 'qty': 1, 'selected': false},
+          {'name': 'Non-AC Room', 'price': 2000, 'qty': 1, 'selected': false},
+        ];
 
-    /// LOAD EXTRA & DISCOUNT
-    extraPersonCtrl.text =
-        quotationData['extraPersons']?.toString() ?? '0';
-    extraPersonPriceCtrl.text =
-        quotationData['extraPersonPrice']?.toString() ?? '1000';
-    discountCtrl.text = quotationData['discount']?.toString() ?? '0';
+  /// EXTRA & DISCOUNT
+  extraPersonCtrl.text =
+      isEdit ? quotationData['extraPersons']?.toString() ?? '0' : '0';
+  extraPersonPriceCtrl.text =
+      isEdit ? quotationData['extraPersonPrice']?.toString() ?? '1000' : '1000';
+  discountCtrl.text =
+      isEdit ? quotationData['discount']?.toString() ?? '0' : '0';
 
-    /// LOAD FACILITIES
-    facilities = quotationData['facilities'] != null
-        ? List<String>.from(quotationData['facilities'])
-        : [
-            'Welcome Drinks',
-            'Medium Pool (2 Hrs)',
-            'Waterfall & Rain Dance (30 minutes)',
-            'Children Play Area',
-            'Breakfast (Next Day)',
-          ];
+  /// FACILITIES
+  facilities = isEdit && quotationData['facilities'] != null
+      ? List<String>.from(quotationData['facilities'])
+      : [
+          'Welcome Drinks',
+          'Medium Pool (2 Hrs)',
+          'Waterfall & Rain Dance (30 minutes)',
+          'Children Play Area',
+          'Breakfast (Next Day)',
+        ];
 
-    _initialized = true;
-  }
+  _initialized = true;
+}
+
 
   int get roomTotal => rooms
       .where((r) => r['selected'])
-      .fold(0, (s, r) => s + ((r['price'] * r['qty']) as int));
+      .fold(0, (s, r) => s + (r['price'] * r['qty']) as int);
 
   int get extraTotal =>
       (int.tryParse(extraPersonCtrl.text) ?? 0) *
@@ -103,7 +105,7 @@ class _RoomSelectScreenState extends State<RoomSelectScreen> {
 
           const SizedBox(height: 12),
 
-          /// ADD CUSTOM ITEM
+          /// CUSTOM ITEM
           Row(children: [
             Expanded(
               child: TextField(
@@ -215,7 +217,7 @@ class _RoomSelectScreenState extends State<RoomSelectScreen> {
                 context,
                 '/quotation_preview_screen',
                 arguments: {
-                  ...quotationData,
+                  ...quotationData, // 🔥 keeps mode + quotationId
                   'rooms': rooms,
                   'extraPersons': extraPersonCtrl.text,
                   'extraPersonPrice': extraPersonPriceCtrl.text,

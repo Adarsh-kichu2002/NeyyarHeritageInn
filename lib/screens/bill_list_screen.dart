@@ -12,7 +12,6 @@ class _BillListScreenState extends State<BillListScreen> {
   bool _initialized = false;
 
   final advanceCtrl = TextEditingController(text: '0');
-
   final List<Map<String, dynamic>> items = [];
 
   /// DEFAULT ITEMS
@@ -33,8 +32,41 @@ class _BillListScreenState extends State<BillListScreen> {
     _initialized = true;
 
     data = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+    final bool isEdit = data['isEdit'] == true;
 
-    /// PREFILL FROM QUOTATION ROOMS
+    items.clear();
+
+    /// ===============================
+    /// EDIT MODE → MERGE ITEMS PROPERLY
+    /// ===============================
+    if (isEdit && data['items'] != null) {
+      final savedItems = (data['items'] as List)
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+
+      advanceCtrl.text = (data['advance'] ?? 0).toString();
+
+      // Add saved items first
+      items.addAll(savedItems);
+
+      // Add missing default items
+      for (final defaultItem in defaultItems) {
+        final exists = savedItems.any(
+          (e) => e['name'] == defaultItem['name'],
+        );
+
+        if (!exists) {
+          items.add(Map<String, dynamic>.from(defaultItem));
+        }
+      }
+
+      return;
+    }
+
+    /// ===============================
+    /// CREATE MODE
+    /// ===============================
+
     final rooms = (data['rooms'] ?? []) as List;
     for (final r in rooms.where((r) => r['selected'] == true)) {
       items.add({
@@ -44,7 +76,6 @@ class _BillListScreenState extends State<BillListScreen> {
       });
     }
 
-    /// EXTRA PERSONS
     if ((data['extraTotal'] ?? 0) > 0) {
       items.add({
         'name': 'Extra Persons',
@@ -53,11 +84,10 @@ class _BillListScreenState extends State<BillListScreen> {
       });
     }
 
-    /// ADD DEFAULT ITEMS
     items.addAll(defaultItems.map((e) => Map<String, dynamic>.from(e)));
   }
 
-  /// TOTAL CALCULATIONS
+  /// TOTALS
   int get subtotal => items.fold(
         0,
         (s, i) =>
@@ -96,9 +126,6 @@ class _BillListScreenState extends State<BillListScreen> {
                 itemBuilder: (_, i) => _itemEditor(i),
               ),
             ),
-
-            const SizedBox(height: 8),
-
             Align(
               alignment: Alignment.centerRight,
               child: TextButton.icon(
@@ -107,30 +134,23 @@ class _BillListScreenState extends State<BillListScreen> {
                 label: const Text('Add Item'),
               ),
             ),
-
             const Divider(),
-
             TextField(
               controller: advanceCtrl,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(labelText: 'Advance'),
               onChanged: (_) => setState(() {}),
             ),
-
             const SizedBox(height: 8),
-
             _amountRow('Subtotal', subtotal),
             _amountRow('GST (5%)', gst),
             _amountRow('Balance', balance, bold: true),
-
             const SizedBox(height: 12),
-
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 child: const Text('Preview Bill'),
                 onPressed: () {
-                  /// 🔑 FILTER ITEMS WITH QTY > 0 ONLY
                   final previewItems = items
                       .where((i) =>
                           (int.tryParse(i['qty'].toString()) ?? 0) > 0)
@@ -157,7 +177,6 @@ class _BillListScreenState extends State<BillListScreen> {
     );
   }
 
-  /// ITEM EDITOR
   Widget _itemEditor(int index) {
     final item = items[index];
 
@@ -172,9 +191,7 @@ class _BillListScreenState extends State<BillListScreen> {
               controller: TextEditingController(text: item['name']),
               onChanged: (v) => item['name'] = v,
             ),
-
             const SizedBox(height: 6),
-
             Row(
               children: [
                 Expanded(
@@ -214,7 +231,6 @@ class _BillListScreenState extends State<BillListScreen> {
     );
   }
 
-  /// AMOUNT ROW
   Widget _amountRow(String label, int value, {bool bold = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,

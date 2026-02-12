@@ -25,28 +25,41 @@ class BillHistoryStore extends ChangeNotifier {
           final data = doc.data();
           return {
             ...data,
-            'invoiceNo': doc.id,
+            'billId': doc.id, // 🔑 INTERNAL ID
             'checkInDate': (data['checkInDate'] as Timestamp?)?.toDate(),
             'checkOutDate': (data['checkOutDate'] as Timestamp?)?.toDate(),
           };
         }));
+
       isLoading = false;
       notifyListeners();
     });
   }
 
-  Future<void> addBill(Map<String, dynamic> bill) async {
-    final invoiceNo = bill['invoiceNo'].toString();
+  /// ADD OR UPDATE BILL (NO DUPLICATES)
+  Future<void> addOrUpdateBill(Map<String, dynamic> bill) async {
+    // 🔐 Stable Firestore ID
+    final billId = bill['billId'] ??
+        DateTime.now().millisecondsSinceEpoch.toString();
 
-    await _db.collection('bills').doc(invoiceNo).set({
+    final docRef = _db.collection('bills').doc(billId);
+
+    final snap = await docRef.get();
+
+    await docRef.set({
       ...bill,
+      'billId': billId,
       'checkInDate': bill['checkInDate'],
       'checkOutDate': bill['checkOutDate'],
-      'createdAt': FieldValue.serverTimestamp(),
+      'invoiceNo': bill['invoiceNo'],
+      'updatedAt': FieldValue.serverTimestamp(),
+
+      // ⛔ createdAt only once
+      if (!snap.exists) 'createdAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }
 
-  Future<void> deleteBill(String invoiceNo) async {
-    await _db.collection('bills').doc(invoiceNo).delete();
+  Future<void> deleteBill(String billId) async {
+    await _db.collection('bills').doc(billId).delete();
   }
 }
