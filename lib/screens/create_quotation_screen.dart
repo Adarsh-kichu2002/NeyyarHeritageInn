@@ -71,18 +71,17 @@ bool isEdit = false;
   final TextEditingController _phone2Controller = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
 
-  final TextEditingController _adultController =
-      TextEditingController(text: '0');
-  final TextEditingController _childrenController =
-      TextEditingController(text: '0');
-  final TextEditingController _childController =
-      TextEditingController(text: '0');
+  final TextEditingController _adultController = TextEditingController();
+  final TextEditingController _childrenController = TextEditingController();
+  final TextEditingController _childController = TextEditingController();
 
   int get totalPax {
-    return int.tryParse(_adultController.text)!.toInt() +
-        int.tryParse(_childrenController.text)!.toInt() +
-        int.tryParse(_childController.text)!.toInt();
-  }
+  final adult = int.tryParse(_adultController.text) ?? 0;
+  final children = int.tryParse(_childrenController.text) ?? 0;
+  final child = int.tryParse(_childController.text) ?? 0;
+
+  return adult + children + child;
+}
 
   Future<void> _pickDate({required bool isCheckIn}) async {
     final picked = await showDatePicker(
@@ -168,9 +167,9 @@ void didChangeDependencies() {
   _checkInTime = _stringToTime(editData!['checkInTime']);
   _checkOutTime = _stringToTime(editData!['checkOutTime']);
 
-  _adultController.text = editData!['adult']?.toString() ?? '0';
-  _childrenController.text = editData!['children']?.toString() ?? '0';
-  _childController.text = editData!['child']?.toString() ?? '0';
+  _adultController.text = editData?['adult']?.toString() ?? '';
+  _childrenController.text = editData?['children']?.toString() ?? '';
+  _childController.text = editData?['child']?.toString() ?? '';
 
   setState(() {});
 }

@@ -19,7 +19,14 @@ class ItineraryPreviewScreen extends StatelessWidget {
     final String? docId = args['docId'];
     final String mode = args['mode'] ?? 'create';
 
-    final DateTime date = args['date'];
+    /// 🔹 SAFELY CONVERT DATE
+    DateTime date;
+    if (args['date'] is Timestamp) {
+      date = (args['date'] as Timestamp).toDate();
+    } else {
+      date = args['date'] as DateTime;
+    }
+
     final String start = args['start'];
     final String end = args['end'];
 
@@ -35,6 +42,7 @@ class ItineraryPreviewScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+
                   /// HEADER
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -58,7 +66,7 @@ class ItineraryPreviewScreen extends StatelessWidget {
                             const SizedBox(height: 4),
                             Text(
                               '${DateFormat('dd-MMM-yyyy').format(date)} '
-                              '(${_to12Hr(start)} – ${_to12Hr(end)})',
+                              '(${_to12Hr('$start-$end')})',
                             ),
                           ],
                         ),
@@ -70,14 +78,14 @@ class ItineraryPreviewScreen extends StatelessWidget {
 
                   /// ADDRESS
                   const Text('To,'),
-                  Text(args['name']),
-                  Text('Mob: ${args['mobile']}'),
+                  Text(args['name'] ?? ''),
+                  Text('Mob: ${args['mobile'] ?? ''}'),
 
                   const SizedBox(height: 16),
 
                   /// INTRO
-                  RichText(
-                    text: const TextSpan(
+                  const Text.rich(
+                    TextSpan(
                       style: TextStyle(color: Colors.black),
                       children: [
                         TextSpan(text: 'At '),
@@ -87,7 +95,9 @@ class ItineraryPreviewScreen extends StatelessWidget {
                         ),
                         TextSpan(
                           text:
-                              'we are committed to providing our guests with exceptional experiences.',
+                              'we are committed to providing our guests with exceptional experiences '
+                      'that create lasting memories. We encourage you to review the details and feel free '
+                      'to reach out if you have any questions or clarification.',
                         ),
                       ],
                     ),
@@ -98,8 +108,10 @@ class ItineraryPreviewScreen extends StatelessWidget {
                   /// PAX
                   Text(
                     'No. of Pax: '
-                    '${args['adult']} + ${args['children']} + ${args['child']} '
-                    '= ${args['adult'] + args['children'] + args['child']}',
+                    '${args['adult'] ?? 0} + '
+                    '${args['children'] ?? 0} + '
+                    '${args['child'] ?? 0} = '
+                    '${(args['adult'] ?? 0) + (args['children'] ?? 0) + (args['child'] ?? 0)}',
                   ),
 
                   const SizedBox(height: 16),
@@ -117,18 +129,22 @@ class ItineraryPreviewScreen extends StatelessWidget {
                   const SizedBox(height: 6),
                   const Text(
                     '• No transportation available.\n'
-                    '• If members are less than confirmed, inform 3 days in advance.\n'
-                    '• Management reserves the right to reschedule.',
+                    '• If members are fewer than started in the booking confirmation, please inform us at least 3 days in advance. Otherwise, the full amount will be charged.\n'
+                    'This policy must be strictly followed.',
                     style: TextStyle(color: Colors.red),
                   ),
 
                   const SizedBox(height: 20),
 
-                  const Text('We look forward to welcoming you.'),
+                  const Text(
+                      'We look forward to welcoming you to Neyyar Heritage Inn. '
+                      'If you have any special requests or require further assistance, '
+                      'please contact our reservation team at +91 85900 71406.'),
                   const SizedBox(height: 12),
-                  const Text('Thanks'),
+                  const Text(
+                      'Thank you for choosing us! We are eager to make your time with us exceptional and unforgettable.'),
                   const SizedBox(height: 12),
-                  const Text('With regards,'),
+                  const Text('Best regards,'),
                   const Text(
                     'Neyyar Heritage Inn',
                     style: TextStyle(fontWeight: FontWeight.bold),
@@ -166,94 +182,102 @@ class ItineraryPreviewScreen extends StatelessWidget {
             ),
           ),
 
-          /// SAVE & PRINT
+          /// SAVE & DOWNLOAD
           Padding(
-            padding: const EdgeInsets.all(12),
-            child: ElevatedButton(
-              onPressed: () async {
-                final firestoreData = {
-                  'package': args['package'],
-                  'name': args['name'],
-                  'mobile': args['mobile'],
-                  'date': Timestamp.fromDate(date),
-                  'start': start,
-                  'end': end,
-                  'adult': args['adult'],
-                  'children': args['children'],
-                  'child': args['child'],
-                  'items': args['items'],
-                  'updatedAt': FieldValue.serverTimestamp(),
-                };
+  padding: const EdgeInsets.all(12),
+  child: ElevatedButton(
+    onPressed: () async {
 
-                if (mode == 'edit' && docId != null) {
-                  await FirebaseFirestore.instance
-                      .collection('itineraries')
-                      .doc(docId)
-                      .update(firestoreData);
-                } else {
-                  await FirebaseFirestore.instance
-                      .collection('itineraries')
-                      .add({
-                    ...firestoreData,
-                    'createdAt': FieldValue.serverTimestamp(),
-                  });
-                }
+      final firestoreData = {
+        'package': args['package'],
+        'name': args['name'],
+        'mobile': args['mobile'],
+        'date': Timestamp.fromDate(date),
+        'start': start,
+        'end': end,
+        'adult': args['adult'],
+        'children': args['children'],
+        'child': args['child'],
+        'items': args['items'],
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
 
-                await Printing.layoutPdf(
-                  onLayout: (_) =>
-                      _buildExactPdf(args, groupedItems),
-                );
+      /// 🔥 ONLY CHECK docId
+      if (docId != null) {
+        await FirebaseFirestore.instance
+            .collection('itineraries')
+            .doc(docId)
+            .update(firestoreData);
+      } else {
+        await FirebaseFirestore.instance
+            .collection('itineraries')
+            .add({
+          ...firestoreData,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
 
-                Navigator.pop(context);
-              },
-              child: const Text('Save & Download'),
-            ),
-          ),
+      await Printing.layoutPdf(
+        onLayout: (_) =>
+            _buildExactPdf({...args, 'date': date}, groupedItems),
+      );
+
+      Navigator.pop(context);
+    },
+    child: Text(docId != null
+        ? 'Update & Download'
+        : 'Save & Download'),
+  ),
+),
         ],
       ),
     );
   }
 
+
   /// ================= HELPERS =================
 
   static Map<String, List<String>> _groupByTime(List items) {
-    final Map<String, List<String>> map = {};
-    for (final e in items) {
-      final time = e['to'] == null || e['to'].isEmpty
-          ? e['from']
-          : '${e['from']} – ${e['to']}';
-      map.putIfAbsent(time, () => []);
-      map[time]!.add(e['title']);
-    }
-    return map;
-  }
+  final Map<String, List<String>> map = {};
+  for (final e in items) {
+    final time = (e['to'] == null || e['to'].isEmpty)
+        ? e['from']
+        : '${e['from']}-${e['to']}'; // removed spaces
 
- static String _to12Hr(String time) {
+    map.putIfAbsent(time, () => []);
+    map[time]!.add(e['title']);
+  }
+  return map;
+}
+
+
+static String _to12Hr(String time) {
+  if (time.isEmpty) return '';
+
   final parts = time.split('-').map((e) => e.trim()).toList();
 
   DateTime parse(String t) {
-    final dt = DateFormat('H:mm').parse(t);
-
-    // 🔧 Fix ambiguous PM times like 6:00 → 18:00
-    if (dt.hour < 8) {
-      return dt.add(const Duration(hours: 12));
-    }
-    return dt;
+    return DateFormat('H:mm').parse(t);
   }
 
-  String format(String t) =>
-      DateFormat('hh:mm a').format(parse(t));
+  String format(DateTime dt) {
+    return DateFormat('h:mm a').format(dt);
+  }
 
-  return parts.length == 2
-      ? '${format(parts[0])} - ${format(parts[1])}'
-      : format(parts[0]);
+  if (parts.length == 2) {
+    final from = format(parse(parts[0]));
+    final to = format(parse(parts[1]));
+    return '$from to $to';
+  } else {
+    return format(parse(parts[0]));
+  }
 }
-
 
   /// ================= TABLE UI =================
 
  Widget _buildTable(Map<String, List<String>> groupedItems) {
-  const double rowHeight = 44; // fixed row height
+  const double rowHeight = 44;
+  const double timeColumnWidth = 140; // slightly wider for single-line time
   int serial = 1;
 
   return Column(
@@ -270,7 +294,7 @@ class ItineraryPreviewScreen extends StatelessWidget {
             _VLine(),
             _Cell(flex: 1, text: 'Item', bold: true),
             _VLine(),
-            _Cell(width: 120, text: 'Time', bold: true),
+            _Cell(width: 140, text: 'Time', bold: true),
           ],
         ),
       ),
@@ -318,7 +342,7 @@ class ItineraryPreviewScreen extends StatelessWidget {
 
             /// ===== MERGED TIME COLUMN =====
             Container(
-              width: 120,
+              width: timeColumnWidth,
               height: totalHeight,
               decoration: const BoxDecoration(
                 border: Border(
@@ -333,9 +357,13 @@ class ItineraryPreviewScreen extends StatelessWidget {
                   child: Text(
                     timeText,
                     textAlign: TextAlign.center,
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Colors.green,
                       fontWeight: FontWeight.w500,
+                      fontSize: 13, // optimized to fit single line
                     ),
                   ),
                 ),
@@ -348,9 +376,10 @@ class ItineraryPreviewScreen extends StatelessWidget {
   );
 }
 
+
   /// ================= PDF =================
 
- Future<Uint8List> _buildExactPdf(
+Future<Uint8List> _buildExactPdf(
   Map<String, dynamic> args,
   Map<String, List<String>> groupedItems,
 ) async {
@@ -360,231 +389,355 @@ class ItineraryPreviewScreen extends StatelessWidget {
     'assets/images/neyyar_logo.png',
   );
 
+  const PdfColor kDarkGreen = PdfColor.fromInt(0xFF34BF3B);
   const double rowHeight = 30;
-  const PdfColor kDarkGreen = PdfColor.fromInt(0xFF1B7F2A);
 
   int serial = 1;
-  final List<pw.TableRow> tableRows = [];
-
-  /// TABLE BODY WITH REAL MERGED TIME
-  /// 
-pw.Widget _buildPdfTable(Map<String, List<String>> groupedItems) {
-  const double rowHeight = 44;
-  int serial = 1;
-
-  final List<pw.TableRow> rows = [];
-
-  /// ================= HEADER =================
-  rows.add(
-    pw.TableRow(
-      decoration: const pw.BoxDecoration(
-        color: PdfColor.fromInt(0xFF34BF3B),
-      ),
-      children: [
-        _pdfHeaderCell('No', width: 40),
-        _pdfHeaderCell('Item'),
-        _pdfHeaderCell('Time', width: 120),
-      ],
-    ),
-  );
-
-  /// ================= BODY =================
-  groupedItems.forEach((timeKey, items) {
-    final timeText = _to12Hr(timeKey);
-    final rowSpan = items.length;
-
-    for (int i = 0; i < items.length; i++) {
-      rows.add(
-        pw.TableRow(
-          children: [
-            _pdfCell(
-              (serial++).toString(),
-              height: rowHeight,
-              align: pw.TextAlign.center,
-            ),
-
-            _pdfCell(
-              items[i],
-              height: rowHeight,
-            ),
-
-            /// ===== REAL MERGED TIME COLUMN =====
-           if (i == 0)
-  pw.Container(
-    height: rowHeight * rowSpan, // 👈 visual merge
-    alignment: pw.Alignment.center,
-    decoration: pw.BoxDecoration(
-      border: pw.Border.all(color: PdfColors.grey),
-    ),
-    child: pw.Text(
-      timeText,
-      textAlign: pw.TextAlign.center,
-      style: pw.TextStyle(
-        fontWeight: pw.FontWeight.bold,
-      ),
-    ),
-  )
-else
-  pw.Container(
-    height: rowHeight,
-    decoration: pw.BoxDecoration(
-      border: pw.Border.all(color: PdfColors.grey),
-    ),
-  ),
-          ],
-        ),
-      );
-    }
-  });
-
-  return pw.Table(
-    border: pw.TableBorder.all(color: PdfColors.black),
-    columnWidths: {
-      0: const pw.FixedColumnWidth(40),
-      1: const pw.FlexColumnWidth(),
-      2: const pw.FixedColumnWidth(120),
-    },
-    children: rows,
-  );
-}
-
-
 
   pdf.addPage(
-    pw.Page(
+    pw.MultiPage(
       margin: const pw.EdgeInsets.all(24),
-      build: (_) => pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          /// HEADER
-          pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
+
+      build: (context) => [
+
+        /// ================= HEADER =================
+        pw.Row(
+  crossAxisAlignment: pw.CrossAxisAlignment.start,
+  children: [
+
+    /// LEFT SIDE - LOGO
+    pw.Image(
+      logo,
+      height: 80,
+    ),
+
+    /// PUSH CONTENT TO RIGHT
+    pw.Spacer(),
+
+    /// RIGHT SIDE - PACKAGE + DATE + TIME
+    pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.end,
+      children: [
+        pw.Text(
+          '${args['package']} ITINERARY',
+          style: pw.TextStyle(
+            fontSize: 18,
+            fontWeight: pw.FontWeight.bold,
+          ),
+        ),
+        pw.SizedBox(height: 4),
+        pw.Text(
+          DateFormat('dd-MMM-yyyy').format(args['date']),
+        ),
+        pw.Text(
+          _to12Hr('${args['start']}-${args['end']}'),
+        ),
+      ],
+    ),
+  ],
+),
+
+        pw.SizedBox(height: 16),
+
+        /// ================= ADDRESS =================
+        pw.Text('To,'),
+        pw.Text(args['name']),
+        pw.Text('Mob: ${args['mobile']}'),
+
+        pw.SizedBox(height: 12),
+
+        /// ================= INTRO =================
+        pw.RichText(
+          text: pw.TextSpan(
             children: [
-              pw.Image(logo, height: 60),
-              pw.SizedBox(width: 12),
-              pw.Expanded(
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.end,
-                  children: [
-                    pw.Text(
-                      '${args['package']} ITINERARY',
-                      style: pw.TextStyle(
-                        fontSize: 18,
-                        fontWeight: pw.FontWeight.bold,
+              const pw.TextSpan(text: 'At '),
+              pw.TextSpan(
+                text: 'Neyyar Heritage Inn - Home Stay ',
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              ),
+              const pw.TextSpan(
+                text:
+                    'we are committed to providing our guests with exceptional experiences '
+                      'that create lasting memories. We encourage you to review the details and feel free '
+                      'to reach out if you have any questions or clarification.',
+              ),
+            ],
+          ),
+        ),
+
+        pw.SizedBox(height: 10),
+
+        /// ================= PAX =================
+        pw.Text(
+          'No. of Pax: ${args['adult']} + ${args['children']} + ${args['child']} '
+          '= ${args['adult'] + args['children'] + args['child']}',
+        ),
+
+        pw.SizedBox(height: 16),
+
+        /// ================= TABLE HEADER =================
+        pw.Row(
+  children: [
+
+    pw.Container(
+      width: 40,
+      height: 35,
+      alignment: pw.Alignment.center,
+      decoration: const pw.BoxDecoration(
+        border: pw.Border(
+          left: pw.BorderSide(),
+          top: pw.BorderSide(),
+          bottom: pw.BorderSide(),
+        ),
+        color: PdfColor.fromInt(0xFF34BF3B),
+      ),
+      child: pw.Text(
+        'No',
+        style: pw.TextStyle(
+          color: PdfColors.white,
+          fontWeight: pw.FontWeight.bold,
+        ),
+      ),
+    ),
+
+    pw.Container(width: 1, height: 35, color: PdfColors.black),
+
+    pw.Expanded(
+      child: pw.Container(
+        height: 35,
+        alignment: pw.Alignment.center,
+        decoration: const pw.BoxDecoration(
+          border: pw.Border(
+            top: pw.BorderSide(),
+            bottom: pw.BorderSide(),
+          ),
+          color: PdfColor.fromInt(0xFF34BF3B),
+        ),
+        child: pw.Text(
+          'Item',
+          style: pw.TextStyle(
+            color: PdfColors.white,
+            fontWeight: pw.FontWeight.bold,
+          ),
+        ),
+      ),
+    ),
+
+    pw.Container(width: 1, height: 35, color: PdfColors.black),
+
+    pw.Container(
+      width: 140,
+      height: 35,
+      alignment: pw.Alignment.center,
+      decoration: const pw.BoxDecoration(
+        border: pw.Border(
+          right: pw.BorderSide(),
+          top: pw.BorderSide(),
+          bottom: pw.BorderSide(),
+        ),
+        color: PdfColor.fromInt(0xFF34BF3B),
+      ),
+      child: pw.Text(
+        'Time',
+        style: pw.TextStyle(
+          color: PdfColors.white,
+          fontWeight: pw.FontWeight.bold,
+        ),
+      ),
+    ),
+  ],
+),
+
+
+        /// ================= TABLE BODY =================
+...groupedItems.entries.map((entry) {
+  final timeText = _to12Hr(entry.key);
+  final items = entry.value;
+  final totalHeight = items.length * rowHeight;
+
+  return pw.Row(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+
+      /// NO + ITEM COLUMN
+      pw.Expanded(
+        child: pw.Column(
+          children: List.generate(items.length, (index) {
+            return pw.Container(
+              height: rowHeight,
+              decoration: const pw.BoxDecoration(
+                border: pw.Border(
+                  left: pw.BorderSide(),
+                  bottom: pw.BorderSide(),
+                ),
+              ),
+              child: pw.Row(
+                children: [
+
+                  /// SL NO
+                  pw.Container(
+                    width: 40,
+                    alignment: pw.Alignment.center,
+                    child: pw.Text(
+                      (serial++).toString(),
+                      style: const pw.TextStyle(
+                        color: PdfColors.green,
                       ),
                     ),
-                    pw.SizedBox(height: 4),
-                    pw.Text(
-                      '${DateFormat('dd-MMM-yyyy').format(args['date'])} '
-                      '(${_to12Hr(args['start'])} ${_to12Hr(args['end'])})',
+                  ),
+
+                  /// VERTICAL LINE
+                  pw.Container(
+                    width: 1,
+                    height: rowHeight,
+                    color: PdfColors.black,
+                  ),
+
+                  /// ITEM
+                  pw.Expanded(
+                    child: pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 6),
+                      child: pw.Text(
+                        items[index],
+                        style: const pw.TextStyle(
+                          color: PdfColors.green,
+                        ),
+                      ),
                     ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          pw.SizedBox(height: 16),
-
-          /// ADDRESS
-          pw.Text('To,'),
-          pw.Text(args['name']),
-          pw.Text('Mob: ${args['mobile']}'),
-
-          pw.SizedBox(height: 12),
-
-          /// INTRO
-          pw.RichText(
-            text: pw.TextSpan(
-              children: [
-                const pw.TextSpan(text: 'At '),
-                pw.TextSpan(
-                  text: 'Neyyar Heritage Inn - Home Stay ',
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                ),
-                const pw.TextSpan(
-                  text:
-                      'we are committed to providing our guests with exceptional experiences.',
-                ),
-              ],
-            ),
-          ),
-
-          pw.SizedBox(height: 10),
-
-          /// PAX
-          pw.Text(
-            'No. of Pax: ${args['adult']} + ${args['children']} + ${args['child']} '
-            '= ${args['adult'] + args['children'] + args['child']}',
-          ),
-
-          pw.SizedBox(height: 16),
-
-          /// TABLE
-          pw.Table(
-            border: pw.TableBorder.all(),
-            columnWidths: {
-              0: const pw.FixedColumnWidth(30),
-              1: const pw.FlexColumnWidth(),
-              2: const pw.FixedColumnWidth(90),
-            },
-            children: [
-              pw.TableRow(
-                decoration: const pw.BoxDecoration(color: kDarkGreen),
-                children: [
-                  _pdfHeaderCell('No'),
-                  _pdfHeaderCell('Item'),
-                  _pdfHeaderCell('Time'),
+                  ),
                 ],
               ),
-              ...tableRows,
-            ],
+            );
+          }),
+        ),
+      ),
+
+      /// MERGED TIME COLUMN
+      pw.Container(
+        width: 140, // slightly wider for single-line time
+        height: totalHeight,
+        alignment: pw.Alignment.center,
+        decoration: const pw.BoxDecoration(
+          border: pw.Border(
+            left: pw.BorderSide(),
+            right: pw.BorderSide(),
+            bottom: pw.BorderSide(),
           ),
-
-          pw.SizedBox(height: 16),
-
-          /// TERMS
-          pw.Text(
-            'Terms & Conditions',
-            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-          ),
-          pw.SizedBox(height: 6),
-          pw.Bullet(text: 'No transportation available.'),
-          pw.Bullet(text: 'If members are less than confirmed, inform 3 days in advance.'),
-          pw.Bullet(text: 'Management reserves the right to reschedule.'),
-
-          pw.Spacer(),
-
-          /// FOOTER BAR (DARK GREEN)
-          pw.Container(
-            color: kDarkGreen,
-            padding: const pw.EdgeInsets.all(8),
-            child: pw.Row(
-              children: [
-                pw.Expanded(
-                  child: pw.Text(
-                    '9656763391',
-                    style: const pw.TextStyle(color: PdfColors.white),
-                  ),
-                ),
-                pw.Expanded(
-                  child: pw.Text(
-                    'neyyarheritageinn@gmail.com',
-                    textAlign: pw.TextAlign.center,
-                    style: const pw.TextStyle(color: PdfColors.white),
-                  ),
-                ),
-                pw.Expanded(
-                  child: pw.Text(
-                    'www.neyyarheritage.in',
-                    textAlign: pw.TextAlign.right,
-                    style: const pw.TextStyle(color: PdfColors.white),
-                  ),
-                ),
-              ],
+        ),
+        child: pw.Padding(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 6),
+          child: pw.FittedBox(
+            fit: pw.BoxFit.scaleDown, // prevents wrapping
+            child: pw.Text(
+              timeText,
+              maxLines: 1,
+              style: pw.TextStyle(
+                color: PdfColors.green,
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 10,
+              ),
             ),
           ),
-        ],
+        ),
+      ),
+    ],
+  );
+}).toList(),
+
+pw.SizedBox(height: 20),
+
+
+        /// ================= TERMS =================
+        pw.Text(
+          'Terms & Conditions',
+          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.green),
+        ),
+        pw.SizedBox(height: 6),
+       pw.Row(
+  crossAxisAlignment: pw.CrossAxisAlignment.start,
+  children: [
+    pw.Container(
+      width: 6,
+      height: 6,
+      margin: const pw.EdgeInsets.only(top: 5, right: 6),
+      decoration: const pw.BoxDecoration(
+        color: PdfColors.red,
+        shape: pw.BoxShape.circle,
+      ),
+    ),
+    pw.Expanded(
+      child: pw.Text(
+        'No transportation available.',
+        style: const pw.TextStyle(color: PdfColors.red),
+      ),
+    ),
+  ],
+),
+
+pw.SizedBox(height: 6),
+
+pw.Row(
+  crossAxisAlignment: pw.CrossAxisAlignment.start,
+  children: [
+    pw.Container(
+      width: 6,
+      height: 6,
+      margin: const pw.EdgeInsets.only(top: 5, right: 6),
+      decoration: const pw.BoxDecoration(
+        color: PdfColors.red,
+        shape: pw.BoxShape.circle,
+      ),
+    ),
+    pw.Expanded(
+      child: pw.Text(
+        'If members are fewer than started in the booking confirmation, please inform us at least 3 days in advance. Otherwise, the full amount will be charged.\n This policy must be strictly followed.',
+        style: const pw.TextStyle(color: PdfColors.red),
+      ),
+    ),
+  ],
+),
+
+
+        pw.SizedBox(height: 20),
+
+        pw.Text('We look forward to welcoming you to Neyyar Heritage Inn. if you have any special requests or require further assistance, please do not hesitate to contact our reservation team at +91 85900 71406.'),
+        pw.SizedBox(height: 12),
+        pw.Text('Thank you for choosing us! We are eager to make your time with us exceptional and unforgettable.'),
+        pw.Text('Best regards,'),
+        pw.Text(
+          'Neyyar Heritage Inn',
+          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+        ),
+      ],
+
+      /// ================= FOOTER =================
+      footer: (context) => pw.Container(
+        color: kDarkGreen,
+        padding: const pw.EdgeInsets.all(8),
+        child: pw.Row(
+          children: [
+            pw.Expanded(
+              child: pw.Text(
+                '+91 9656763391',
+                style: const pw.TextStyle(color: PdfColors.white),
+              ),
+            ),
+            pw.Expanded(
+              child: pw.Text(
+                'neyyarheritageinn@gmail.com',
+                textAlign: pw.TextAlign.center,
+                style: const pw.TextStyle(color: PdfColors.white),
+              ),
+            ),
+            pw.Expanded(
+              child: pw.Text(
+                'www.neyyarheritage.in',
+                textAlign: pw.TextAlign.right,
+                style: const pw.TextStyle(color: PdfColors.white),
+              ),
+            ),
+          ],
+        ),
       ),
     ),
   );
@@ -592,56 +745,7 @@ else
   return pdf.save();
 }
 
-/// ================= CELL HELPERS =================
-static const PdfColor kDarkGreen = PdfColor.fromInt(0xFF34BF3B);
-
-pw.Widget _pdfHeaderCell(
-  String text, {
-  double? width,
-}) {
-  return pw.Container(
-    height: 44,
-    width: width,
-    alignment: pw.Alignment.center,
-    decoration: pw.BoxDecoration(
-      border: pw.Border.all(color: PdfColors.black),
-      color: const PdfColor.fromInt(0xFF34BF3B),
-    ),
-    child: pw.Text(
-      text,
-      style: pw.TextStyle(
-        color: PdfColors.white,
-        fontWeight: pw.FontWeight.bold,
-      ),
-    ),
-  );
 }
-
-pw.Widget _pdfCell(
-  String text, {
-  double height = 44,
-  pw.TextAlign align = pw.TextAlign.left,
-  bool bold = false,
-}) {
-  return pw.Container(
-    height: height,
-    padding: const pw.EdgeInsets.symmetric(horizontal: 6),
-    alignment: pw.Alignment.centerLeft,
-    decoration: pw.BoxDecoration(
-      border: pw.Border.all(color: PdfColors.black),
-    ),
-    child: pw.Text(
-      text,
-      textAlign: align,
-      style: pw.TextStyle(
-        color: PdfColors.green,
-        fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
-      ),
-    ),
-  );
-}
-}
-
 /// ================= TABLE WIDGETS =================
 
 class _Cell extends StatelessWidget {

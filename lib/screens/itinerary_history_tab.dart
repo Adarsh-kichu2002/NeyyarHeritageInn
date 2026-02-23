@@ -11,104 +11,213 @@ class ItineraryHistoryTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView.separated(
-      itemCount: docs.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
-      itemBuilder: (context, index) {
-        final doc = docs[index];
-        final data = doc.data() as Map<String, dynamic>;
+  return SingleChildScrollView(
+    child: SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
 
-        return ListTile(
-          leading: Text('${index + 1}'),
-          title: Text(data['name'] ?? '-'),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(data['mobile'] ?? '-'),
-              Text('Package: ${data['package'] ?? 'Day Out'}'),
-              Text(
-                'Check-in: ${_fmtDate(data['checkInDate'])}  |  '
-                'Check-out: ${_fmtDate(data['checkOutDate'])}',
-              ),
-            ],
+          /// 🔹 HEADER ROW
+          Container(
+            color: const Color.fromARGB(255, 56, 220, 62),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: const Row(
+              children: [
+                _HeaderCell('Sl No', 60),
+                _HeaderCell('Name', 150),
+                _HeaderCell('Phone', 130),
+                _HeaderCell('Date', 110),
+                _HeaderCell('No. of Pax', 100),
+                _HeaderCell('Actions', 160),
+              ],
+            ),
           ),
-          trailing: Wrap(
-            spacing: 4,
-            children: [
-              /// 👁 VIEW
-              IconButton(
-                icon: const Icon(Icons.visibility),
-                onPressed: () {
-                  Navigator.pushNamed(
-                    context,
-                    '/itinerary_preview',
-                    arguments: {
-                      ...data,
-                      'docId': doc.id,
-                      'mode': 'view',
-                    },
-                  );
-                },
-              ),
 
-              /// ✏ EDIT
-              IconButton(
-                icon: const Icon(Icons.edit),
-                onPressed: () {
-                  Navigator.pushNamed(
-                    context,
-                    '/create_itinerary',
-                    arguments: {
-                      ...data,
-                      'docId': doc.id,
-                      'mode': 'edit',
-                    },
-                  );
-                },
-              ),
+          /// 🔹 DATA ROWS
+          ...docs.asMap().entries.map((entry) {
+            final index = entry.key;
+            final doc = entry.value;
+            final data = doc.data() as Map<String, dynamic>;
 
-              /// 🗑 DELETE
-              IconButton(
-                icon: const Icon(Icons.delete, color: Colors.red),
-                onPressed: () async {
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (_) => AlertDialog(
-                      title: const Text('Delete Itinerary'),
-                      content: const Text('Are you sure?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancel'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          child: const Text('Delete'),
+            final adult = (data['adult'] ?? 0) as int;
+            final children = (data['children'] ?? 0) as int;
+            final child = (data['child'] ?? 0) as int;
+            final totalPax = adult + children + child;
+
+            return Container(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: const BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: Colors.grey),
+                ),
+              ),
+              child: Row(
+                children: [
+
+                  /// Sl No
+                  _DataCell('${index + 1}', 60),
+
+                  /// Name
+                  _DataCell(data['name'] ?? '-', 150),
+
+                  /// Phone
+                  _DataCell(data['mobile'] ?? '-', 130),
+
+                  /// Date
+                  _DataCell(_fmtDate(data['date']), 110),
+
+                  /// Total Pax
+                  _DataCell('$totalPax', 100),
+
+                  /// Actions
+                  SizedBox(
+                    width: 160,
+                    child: Row(
+                      children: [
+
+                        /// 👁 VIEW
+                        IconButton(
+  icon: const Icon(Icons.visibility, size: 20, color: Colors.green),
+  onPressed: () {
+    final convertedData = {
+      ...data,
+      'date': (data['date'] as Timestamp?)?.toDate(),
+    };
+
+    Navigator.pushNamed(
+      context,
+      '/itinerary_preview',
+      arguments: {
+        ...convertedData,
+        'docId': doc.id,
+        'mode': 'view',
+      },
+    );
+  },
+),
+
+
+                        /// ✏ EDIT
+                       IconButton(
+  icon: const Icon(Icons.edit, size: 20, color: Colors.blue),
+  onPressed: () {
+    final convertedData = {
+      ...data,
+      'date': (data['date'] as Timestamp?)?.toDate(),
+    };
+
+    Navigator.pushNamed(
+      context,
+      '/create_itinerary',
+      arguments: {
+        ...convertedData,
+        'docId': doc.id,
+        'mode': 'edit',
+      },
+    );
+  },
+),
+
+
+                        /// 🗑 DELETE
+                        IconButton(
+                          icon: const Icon(Icons.delete,
+                              color: Colors.red, size: 20),
+                          onPressed: () async {
+                            final confirm = await showDialog<bool>(
+                              context: context,
+                              builder: (_) => AlertDialog(
+                                title:
+                                    const Text('Delete Itinerary'),
+                                content:
+                                    const Text('Are you sure?'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, false),
+                                    child:
+                                        const Text('Cancel'),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, true),
+                                    child:
+                                        const Text('Delete'),
+                                  ),
+                                ],
+                              ),
+                            );
+
+                            if (confirm == true) {
+                              await FirebaseFirestore.instance
+                                  .collection('itineraries')
+                                  .doc(doc.id)
+                                  .delete();
+                            }
+                          },
                         ),
                       ],
                     ),
-                  );
-
-                  if (confirm == true) {
-                    await FirebaseFirestore.instance
-                        .collection('itineraries')
-                        .doc(doc.id)
-                        .delete();
-                  }
-                },
+                  ),
+                ],
               ),
-            ],
-          ),
-        );
-      },
-    );
+            );
+          }).toList(),
+        ],
+      ),
+    )
+  );
   }
 
-  String _fmtDate(dynamic d) {
+  /// 🔹 Format Date
+  static String _fmtDate(dynamic d) {
     if (d == null) return '-';
     if (d is Timestamp) {
-      return d.toDate().toString().split(' ').first;
+      final date = d.toDate();
+      return "${date.day.toString().padLeft(2, '0')}-"
+          "${date.month.toString().padLeft(2, '0')}-"
+          "${date.year}";
     }
     return d.toString();
+  }
+}
+
+/// 🔹 Header Cell Widget
+class _HeaderCell extends StatelessWidget {
+  final String text;
+  final double width;
+
+  const _HeaderCell(this.text, this.width);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      alignment: Alignment.center,
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+}
+
+/// 🔹 Data Cell Widget
+class _DataCell extends StatelessWidget {
+  final String text;
+  final double width;
+
+  const _DataCell(this.text, this.width);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      alignment: Alignment.center,
+      child: Text(text),
+    );
   }
 }

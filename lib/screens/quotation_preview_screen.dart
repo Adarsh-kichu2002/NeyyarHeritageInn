@@ -1,4 +1,3 @@
-// quotation_preview_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:neyyar_heritage/history/quotation_history_store.dart';
@@ -181,6 +180,112 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen> {
 
             const SizedBox(height: 24),
 
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '+\n'
+                'GST 5%\n',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+
+             const SizedBox(height: 24),
+                
+            //Term and Conditions
+            const Text('Terms and Conditions', 
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 65, 186, 162))),
+            const SizedBox(height: 6),
+            const Text(
+              '• All rates are valid for 15 days\n'
+              '• 50% advance paymentn is required to confirm the booking. Reservation will be allocated and confirmed on a first-come, first-served basis,'
+              'subject to receipt of the advance payment\n'
+              '• The remaining 50% is to be paid upon check-in\n'
+              '• Food usage: Outside food is strictly not permitted inside property\n'
+            ),
+           const Text(
+              '• No Transportation Available\n',
+              style: TextStyle(fontSize: 14, height: 1.3, color: Colors.red, fontWeight: FontWeight.bold),
+            ),
+              const Text(
+              '• If there is less than the number of members mentioned in the booking confirmation, it should be informed 2 days in advance\n'
+              '  Otherwise the full amount will have to be paid.\n'
+              '• Cancellation made 72 hours prior to the arrival date will receive a full refund of the advance.\n'
+              '• Cancellation made within 72 hours of the arrival date will result in forfeiture of the advance.\n',
+              style: TextStyle(fontSize: 14, height: 1.3, color: Colors.red, fontWeight: FontWeight.w500),
+              ),
+
+              const SizedBox(height: 16),
+             const Row(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+
+    /// LEFT SIDE — WE OFFER
+    Expanded(
+      flex: 1,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'WE OFFER',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            '• AC SUITE ROOMS / NON AC ROOMS\n'
+            '• PRIVATE VILLA / PARTIES / EVENTS\n'
+            '• TENT STAY\n'
+            '• HUT STAY\n'
+            '• DAY OUT PACKAGES\n'
+            '• TREKKING PACKAGES\n'
+            '• DESTINATION WEDDING',
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.4,
+              fontWeight: FontWeight.bold,
+              color: Color.fromARGB(255, 0, 0, 0),
+            ),
+          ),
+        ],
+      ),
+    ),
+
+    SizedBox(width: 40),
+
+    /// RIGHT SIDE — MESSAGE
+    Expanded(
+      flex: 1,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'We look forward to welcoming you to Neyyar Heritage Inn. '
+            'If you have any special requests or require further assistance, '
+            'please do not hesitate to contact our reservation team at +91 9656763391.',
+            style: TextStyle(
+              color: Color.fromARGB(255, 3, 0, 9),
+              height: 1.4,
+            ),
+          ),
+          SizedBox(height: 12),
+          Text(
+            'Thank you for choosing us! We are eager to make your time with us exceptional and unforgettable.',
+          ),
+          SizedBox(height: 12),
+          Text('Best regards,'),
+          Text(
+            'Neyyar Heritage Inn',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    ),
+  ],
+),
+
+
             /// FOOTER
             Container(
               width: double.infinity,
@@ -271,18 +376,21 @@ Future<void> _downloadPdf() async {
   final List facilities = data['facilities'] as List? ?? [];
 
   /// Common styles (MATCH PREVIEW)
-  const bodyStyle = pw.TextStyle(fontSize: 14, height: 1.3);
+  const bodyStyle = pw.TextStyle(fontSize: 12, height: 1.2);
   final boldStyle =
-      pw.TextStyle(fontSize: 14, height: 1.3, fontWeight: pw.FontWeight.bold);
+      pw.TextStyle(fontSize: 12, height: 1.2, fontWeight: pw.FontWeight.bold);
 
   pdf.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(24),
       theme: pw.ThemeData.withFont(base: fontRegular, bold: fontBold),
-      build: (context) => [
-        /// HEADER
-        pw.Row(
+    build: (context) {
+      return [
+        pw.Column(
+          children: [
+            /// HEADER
+            pw.Row(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
             pw.Image(pw.MemoryImage(logoBytes), height: 60),
@@ -307,19 +415,27 @@ Future<void> _downloadPdf() async {
           ],
         ),
 
-        pw.SizedBox(height: 16),
+        pw.SizedBox(height: 12),
         pw.Divider(),
 
         /// CUSTOMER DETAILS
-        pw.Text('To,', style: bodyStyle),
-        pw.Text(data['customerName'] ?? '', style: boldStyle),
-        pw.Text('Mob: ${data['phone1'] ?? ''}', style: bodyStyle),
-        if (data['phone2'] != null && data['phone2'].toString().isNotEmpty)
-          pw.Text('Alt Mob: ${data['phone2']}', style: bodyStyle),
-        if (data['address'] != null && data['address'].toString().isNotEmpty)
-          pw.Text(data['address'], style: bodyStyle),
+        pw.Align(
+          alignment: pw.Alignment.centerLeft,
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text('To,', style: bodyStyle),
+              pw.Text(data['customerName'] ?? '', style: boldStyle),
+              pw.Text('Mob: ${data['phone1'] ?? ''}', style: bodyStyle),
+              if (data['phone2'] != null && data['phone2'].toString().isNotEmpty)
+                pw.Text('Alt Mob: ${data['phone2']}', style: bodyStyle),
+              if (data['address'] != null && data['address'].toString().isNotEmpty)
+                pw.Text(data['address'], style: bodyStyle),
+            ],
+          ),
+        ),
 
-        pw.SizedBox(height: 16),
+        pw.SizedBox(height: 12),
 
         /// DESCRIPTION (MATCH PREVIEW PARAGRAPH)
         pw.RichText(
@@ -352,7 +468,7 @@ Future<void> _downloadPdf() async {
           ),
         ),
 
-        pw.SizedBox(height: 20),
+        pw.SizedBox(height: 12),
 
         /// TABLE HEADER
         pw.Container(
@@ -412,44 +528,56 @@ Future<void> _downloadPdf() async {
               ),
             ),
 
-        pw.SizedBox(height: 12),
+        pw.SizedBox(height: 10),
 
         /// EXTRA PERSONS
         if ((data['extraTotal'] ?? 0) > 0)
-          pw.Text(
-            'Extra Persons (${data['extraPersons']} x ${data['extraPersonPrice']}) '
-            '₹${data['extraTotal']}',
-            style: bodyStyle,
+          pw.Align(
+            alignment: pw.Alignment.centerRight,
+             child: pw.Text(
+              'Extra Persons (${data['extraPersons']} x ${data['extraPersonPrice']}) ₹${data['extraTotal']}',
+              style: bodyStyle,
+            ),
           ),
 
         /// DISCOUNT
         if ((data['discount'] ?? 0) > 0)
-          pw.Text(
-            'Discount  -₹${data['discount']}',
-            style: const pw.TextStyle(
-                fontSize: 14,
-                color: PdfColors.red,
-                height: 1.3),
-          ),
+          pw.Align(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text(
+              'Discount  -₹${data['discount']}',
+              style: const pw.TextStyle(
+                  fontSize: 12,
+                  color: PdfColors.red,
+                  height: 1.2),
+            ),
+          ),  
 
-        pw.SizedBox(height: 12),
+        pw.SizedBox(height: 10),
 
         /// PAX
-        pw.Text(
-          'Pax -- ${data['adult'] ?? 0}+${data['children'] ?? 0}+${data['child'] ?? 0} = ${data['totalPax'] ?? 0}',
-          style: boldStyle,
+        pw.Align(
+          alignment: pw.Alignment.centerLeft,
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(
+                'Pax -- ${data['adult'] ?? 0}+${data['children'] ?? 0}+${data['child'] ?? 0} = ${data['totalPax'] ?? 0}',
+                style: boldStyle,
+              ),
+            ],
+          ),
         ),
-
         pw.SizedBox(height: 12),
 
         /// FACILITIES
-        pw.Text('Facilities', style: boldStyle),
-        ...facilities.map(
-          (f) => pw.Row(
+        pw.Align(
+          alignment: pw.Alignment.centerLeft,
+          child: pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Text('• ', style: bodyStyle),
-              pw.Expanded(child: pw.Text(f, style: bodyStyle)),
+              pw.Text('Facilities', style: boldStyle),
+              ...facilities.map((f) => pw.Text('• $f', style: bodyStyle)),
             ],
           ),
         ),
@@ -462,32 +590,162 @@ Future<void> _downloadPdf() async {
           child: pw.Text(
             'Total: ₹${data['total'] ?? 0}',
             style: pw.TextStyle(
-                fontSize: 18,
+                fontSize: 14,
                 fontWeight: pw.FontWeight.bold,
-                height: 1.3),
+                height: 1.2),
           ),
         ),
 
-        pw.SizedBox(height: 24),
+        pw.SizedBox(height: 10),
 
-        /// FOOTER
-        pw.Container(
-          width: double.infinity,
-          padding:
-              const pw.EdgeInsets.symmetric(vertical: 14, horizontal: 10),
-          color: PdfColors.green800,
+        pw.Align(
+          alignment: pw.Alignment.centerRight,
           child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Text('+91 9656763391 | homestay.neyyar@gmail.com',
-                  style:
-                      const pw.TextStyle(color: PdfColors.white, fontSize: 12)),
-              pw.Text('www.neyyarheritage.in',
-                  style:
-                      const pw.TextStyle(color: PdfColors.white, fontSize: 12)),
+              pw.Text(
+                '+\n'
+                'GST 5%\n',
+                style: pw.TextStyle(
+                    fontSize: 14,
+                    fontWeight: pw.FontWeight.bold,
+                    height: 1.2),
+              ),
             ],
           ),
         ),
-      ],
+
+         pw.SizedBox(height: 10),
+
+        // TERMS AND CONDITIONS
+        pw.Align(
+          alignment: pw.Alignment.centerLeft,
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+        pw.Text('Terms and Conditions',
+            style: pw.TextStyle(
+                fontSize: 12,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.green800)),
+            ],
+          ),
+        ),
+        pw.SizedBox(height: 6),
+        pw.Text(
+          '• All rates are valid for 15 days\n'
+          '• 50% advance payment is required to confirm the booking. Reservation will be allocated and confirmed on a first-come, first-served basis,'
+          'subject to receipt of the advance payment\n'
+          '• The remaining 50% is to be paid upon check-in\n'
+          '• Food usage: Outside food is strictly not permitted inside property\n',
+          style: const pw.TextStyle(fontSize: 10, height: 1.2),
+        ),
+        pw.Text(
+          '• No Transportation Available\n'
+          '• If there is less than the number of members mentioned in the booking confirmation, it should be informed 2 days in advance\n'
+          '  Otherwise the full amount will have to be paid.\n'
+          '• Cancellation made 72 hours prior to the arrival date will receive a full refund of the advance.\n'
+          '• Cancellation made within 72 hours of the arrival date will result in forfeiture of the advance.\n',
+          style: const pw.TextStyle(fontSize: 10, height: 1.2, color: PdfColors.red),
+        ),
+
+        pw.SizedBox(height: 12),
+
+        pw.Row(
+  crossAxisAlignment: pw.CrossAxisAlignment.start,
+  children: [
+
+    /// LEFT SIDE — WE OFFER
+    pw.Expanded(
+      flex: 1,
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            'WE OFFER',
+            style: pw.TextStyle(
+              fontSize: 14,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+          pw.SizedBox(height: 6),
+          pw.Text(
+            '• AC SUITE ROOMS / NON AC ROOMS\n'
+            '• PRIVATE VILLA / PARTIES / EVENTS\n'
+            '• TENT STAY\n'
+            '• HUT STAY\n'
+            '• DAY OUT PACKAGES\n'
+            '• TREKKING PACKAGES\n'
+            '• DESTINATION WEDDING',
+            style: pw.TextStyle(
+              fontSize: 8,
+              fontWeight: pw.FontWeight.bold,
+              lineSpacing: 2,
+            ),
+          ),
+        ],
+      ),
+    ),
+
+    pw.SizedBox(width: 30),
+
+    /// RIGHT SIDE — MESSAGE
+    pw.Expanded(
+      flex: 1,
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            'We look forward to welcoming you to Neyyar Heritage Inn. '
+            'If you have any special requests or require further assistance, '
+            'please do not hesitate to contact our reservation team at +91 9656763391.',
+            style: const pw.TextStyle(
+              fontSize: 10,
+              lineSpacing: 3,
+            ),
+          ),
+          pw.SizedBox(height: 8),
+          pw.Text(
+            'Thank you for choosing us! We are eager to make your time with us exceptional and unforgettable.',
+            style: const pw.TextStyle(fontSize: 10),
+          ),
+          pw.SizedBox(height: 8),
+          pw.Text('Best regards,', style: const pw.TextStyle(fontSize: 10)),
+          pw.Text(
+            'Neyyar Heritage Inn',
+            style: pw.TextStyle(
+              fontSize: 10,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    ),
+  ],
+),
+
+
+      /// FOOTER
+      pw.Container(
+        width: double.infinity,
+        padding:
+            const pw.EdgeInsets.symmetric(vertical: 6),
+        color: PdfColors.green800,
+        child: pw.Column(
+          children: [
+            pw.Text('+91 9656763391 | homestay.neyyar@gmail.com',
+                style:
+                    const pw.TextStyle(color: PdfColors.white, fontSize: 10)),
+            pw.Text('www.neyyarheritage.in',
+                style:
+                    const pw.TextStyle(color: PdfColors.white, fontSize: 10)),
+          ],
+        ),
+      ),
+          ],
+        ),
+      ];
+    },
     ),
   );
 
@@ -498,15 +756,6 @@ Future<void> _downloadPdf() async {
   await file.writeAsBytes(await pdf.save());
 
   await Printing.layoutPdf(onLayout: (_) => pdf.save());
-}
-
-
-/// HELPER
-pw.Text _whiteText(String text) {
-  return pw.Text(
-    text,
-    style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold),
-  );
 }
 
   /// WIDGETS

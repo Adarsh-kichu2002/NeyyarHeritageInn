@@ -82,7 +82,7 @@ class _QuotationHistoryTabState extends State<QuotationHistoryTab> {
                       final DateTime? checkOut = q['checkOutDate'] as DateTime?;
 
                       return DataRow(
-                        key: ValueKey(quotationId),
+                        key: ValueKey('${quotationId}_$i'),
                         cells: [
                           DataCell(Text('${i + 1}')),
                           DataCell(Text(q['customerName'] ?? '')),
@@ -96,7 +96,7 @@ class _QuotationHistoryTabState extends State<QuotationHistoryTab> {
                             Row(
                               children: [
                                 IconButton(
-                                  icon: const Icon(Icons.visibility),
+                                  icon: const Icon(Icons.visibility, color: Colors.green),
                                   tooltip: 'View',
                                   onPressed: () {
                                     Navigator.pushNamed(
@@ -107,7 +107,7 @@ class _QuotationHistoryTabState extends State<QuotationHistoryTab> {
                                   },
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.edit),
+                                  icon: const Icon(Icons.edit, color: Colors.blue),
                                   tooltip: 'Edit',
                                   onPressed: () {
                                     Navigator.pushNamed(
@@ -121,14 +121,14 @@ class _QuotationHistoryTabState extends State<QuotationHistoryTab> {
                                   },
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.delete),
+                                  icon: const Icon(Icons.delete, color: Colors.red),
                                   tooltip: 'Delete',
                                   onPressed: () {
                                     _confirmDelete(context, quotationId);
                                   },
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.receipt_long),
+                                  icon: const Icon(Icons.receipt_long, color: Colors.orange),
                                   tooltip: 'Generate Bill',
                                   onPressed: () {
                                     Navigator.pushNamed(

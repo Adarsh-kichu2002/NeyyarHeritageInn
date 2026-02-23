@@ -90,6 +90,8 @@ class _BillPreviewScreenState extends State<BillPreviewScreen> {
               'Date: ${_fmtDate(data['checkOutDate'])}',
               style: TextStyle(color: green),
             ),
+            Text('GST NO: 32BUMPR0206G1ZX', style: TextStyle(color: green) 
+            )
           ],
         ),
       ],
@@ -317,6 +319,8 @@ class _BillPreviewScreenState extends State<BillPreviewScreen> {
                   'Date: ${_fmtDate(data['checkOutDate'])}',
                   style: pw.TextStyle(color: green, fontSize: 12),
                 ),
+                pw.Text('GST NO: 32BUMPR0206G1ZX',
+                    style: pw.TextStyle(color: green, fontSize: 12))
               ],
             ),
           ],

@@ -11,6 +11,10 @@ class CreateItineraryScreen extends StatefulWidget {
 class _CreateItineraryScreenState extends State<CreateItineraryScreen> {
   final _formKey = GlobalKey<FormState>();
 
+  bool isEdit = false;
+  String? docId;
+
+
   final nameCtrl = TextEditingController();
   final mobileCtrl = TextEditingController();
 
@@ -20,16 +24,26 @@ class _CreateItineraryScreenState extends State<CreateItineraryScreen> {
   TimeOfDay start = const TimeOfDay(hour: 10, minute: 0);
   TimeOfDay end = const TimeOfDay(hour: 18, minute: 0);
 
-  final adultCtrl = TextEditingController(text: '0');
-  final childrenCtrl = TextEditingController(text: '0');
-  final childCtrl = TextEditingController(text: '0');
+  int _timeToMinutes(String time) {
+  try {
+    final dt = DateFormat('H:mm').parse(time);
+    return dt.hour * 60 + dt.minute;
+  } catch (_) {
+    return 0; // fallback if empty/invalid
+  }
+}
+
+final adultCtrl = TextEditingController();
+final childrenCtrl = TextEditingController();
+final childCtrl = TextEditingController();
+
 
   List<Map<String, TextEditingController>> items = [
     _item('Welcome Drinks (Neyyar Dam Cafe)', '10:00', '12:00'),
     _item('Jungle Boat Safari', '10:00', '12:00'),
     _item('Crocodile & Deer Park Visit [Boating]', '10:00', '12:00'),
-    _item('Check-in – Neyyar Heritage Inn', '12:00', ''),
-    _item('Lunch – Samudra Sadhya', '13:30', '14:00'),
+    _item('Check-in - Neyyar Heritage Inn', '12:00', ''),
+    _item('Lunch - Samudra Sadhya', '13:30', '14:00'),
     _item('Pool with waterfall and Rain dance', '14:00', '15:30'),
     _item('Tea & Snacks', '15:30', '16:00'),
     _item('Mayam Kadavu Visit & Kalipara Trekking', '16:00', '18:00')
@@ -47,10 +61,55 @@ class _CreateItineraryScreenState extends State<CreateItineraryScreen> {
     };
   }
 
-  int get totalPax =>
-      int.parse(adultCtrl.text) +
-      int.parse(childrenCtrl.text) +
-      int.parse(childCtrl.text);
+  int get totalPax {
+  final adult = int.tryParse(adultCtrl.text) ?? 0;
+  final children = int.tryParse(childrenCtrl.text) ?? 0;
+  final child = int.tryParse(childCtrl.text) ?? 0;
+
+  return adult + children + child;
+}
+
+
+
+  @override
+void didChangeDependencies() {
+  super.didChangeDependencies();
+
+  final args =
+      ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+
+  if (args != null && args['mode'] == 'edit' && !isEdit) {
+    isEdit = true;
+    docId = args['docId'];
+
+    packageName = args['package'] ?? 'DAY OUT';
+    nameCtrl.text = args['name'] ?? '';
+    mobileCtrl.text = args['mobile'] ?? '';
+
+    if (args['date'] is DateTime) {
+      date = args['date'];
+    }
+
+   adultCtrl.text = (args['adult'] ?? '').toString();
+   childrenCtrl.text = (args['children'] ?? '').toString();
+   childCtrl.text = (args['child'] ?? '').toString();
+
+    // Load items
+    if (args['items'] != null) {
+      items = (args['items'] as List)
+          .map<Map<String, TextEditingController>>((e) {
+        return {
+          'title': TextEditingController(text: e['title']),
+          'from': TextEditingController(text: e['from']),
+          'to': TextEditingController(text: e['to']),
+        };
+      }).toList();
+    }
+
+    setState(() {});
+  }
+}
+    
 
   @override
   Widget build(BuildContext context) {
@@ -201,65 +260,102 @@ class _CreateItineraryScreenState extends State<CreateItineraryScreen> {
     );
   }
 
-  Widget _itemRow(Map<String, TextEditingController> item) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          children: [
-            TextField(
-              controller: item['title'],
-              decoration: const InputDecoration(labelText: 'Title'),
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: item['from'],
-                    decoration: const InputDecoration(labelText: 'From'),
-                  ),
+ Widget _itemRow(Map<String, TextEditingController> item) {
+  return Card(
+    margin: const EdgeInsets.symmetric(vertical: 4),
+    child: Padding(
+      padding: const EdgeInsets.all(8),
+      child: Column(
+        children: [
+
+          /// TITLE + DELETE BUTTON
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: item['title'],
+                  decoration: const InputDecoration(labelText: 'Title'),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: item['to'],
-                    decoration: const InputDecoration(labelText: 'To'),
-                  ),
+              ),
+
+              IconButton(
+                icon: const Icon(Icons.delete, color: Colors.red),
+                onPressed: () {
+                  if (items.length == 1) return; // prevent deleting last item
+
+                  setState(() {
+                    // Dispose controllers properly
+                    item['title']?.dispose();
+                    item['from']?.dispose();
+                    item['to']?.dispose();
+
+                    items.remove(item);
+                  });
+                },
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 6),
+
+          /// FROM + TO
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: item['from'],
+                  decoration: const InputDecoration(labelText: 'From'),
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: item['to'],
+                  decoration: const InputDecoration(labelText: 'To'),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   void _preview() {
     if (!_formKey.currentState!.validate()) return;
 
-    Navigator.pushNamed(
-      context,
-      '/itinerary_preview',
-      arguments: {
-        'package': packageName,
-        'date': date,
-        'start': start.format(context),
-        'end': end.format(context),
-        'name': nameCtrl.text,
-        'mobile': mobileCtrl.text,
-        'adult': int.parse(adultCtrl.text),
-        'children': int.parse(childrenCtrl.text),
-        'child': int.parse(childCtrl.text),
-        'items': items
-            .map((e) => {
-                  'title': e['title']!.text,
-                  'from': e['from']!.text,
-                  'to': e['to']!.text,
-                })
-            .toList(),
-      },
-    );
+    final sortedItems = items
+        .map((e) => {
+              'title': e['title']!.text,
+              'from': e['from']!.text,
+              'to': e['to']!.text,
+            })
+        .toList()
+      ..sort((a, b) =>
+          _timeToMinutes(a['from']!)
+              .compareTo(_timeToMinutes(b['from']!)));
+
+   Navigator.pushNamed(
+  context,
+  '/itinerary_preview',
+  arguments: {
+    'package': packageName,
+    'date': date,
+    'start': start.format(context),
+    'end': end.format(context),
+    'name': nameCtrl.text,
+    'mobile': mobileCtrl.text,
+    'adult': int.parse(adultCtrl.text),
+    'children': int.parse(childrenCtrl.text),
+    'child': int.parse(childCtrl.text),
+    'items': sortedItems,
+
+    /// 🔥 VERY IMPORTANT
+    'docId': docId,
+  },
+);
+
   }
 
   Future<void> _pickDate() async {

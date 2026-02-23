@@ -94,7 +94,7 @@ class _BillHistoryTabState extends State<BillHistoryTab> {
                             Row(
                               children: [
                                 IconButton(
-                                  icon: const Icon(Icons.visibility),
+                                  icon: const Icon(Icons.visibility, color: Colors.green),
                                   onPressed: () {
                                     Navigator.pushNamed(
                                       context,
@@ -105,7 +105,7 @@ class _BillHistoryTabState extends State<BillHistoryTab> {
                                 ),
                                 // ✏️ EDIT
     IconButton(
-  icon: const Icon(Icons.edit),
+  icon: const Icon(Icons.edit, color: Colors.blue),
   onPressed: () {
     Navigator.pushNamed(
       context,
@@ -120,7 +120,7 @@ class _BillHistoryTabState extends State<BillHistoryTab> {
 ),
 
                                 IconButton(
-                                  icon: const Icon(Icons.delete),
+                                  icon: const Icon(Icons.delete, color: Colors.red),
                                   onPressed: () =>
                                       _confirmDelete(context, b['billId']),
                                 ),

@@ -34,7 +34,7 @@ class QuotationHistoryStore extends ChangeNotifier {
           }
 
           return {
-            'id': doc.id,
+            'id': doc.id, // 🔥 Always store Firestore auto ID
             ...data,
             'checkInDate': parseDate(data['checkInDate']),
             'checkOutDate': parseDate(data['checkOutDate']),
@@ -50,12 +50,9 @@ class QuotationHistoryStore extends ChangeNotifier {
     });
   }
 
-  /// ➕ ADD QUOTATION
+  /// ➕ ADD QUOTATION (AUTO DOCUMENT ID — FIXED)
   Future<void> addQuotation(Map<String, dynamic> quotation) async {
-    final docRef = _db.collection('quotations').doc(
-          quotation['quotationNo']?.toString() ??
-              DateTime.now().millisecondsSinceEpoch.toString(),
-        );
+    final docRef = _db.collection('quotations').doc(); // ✅ AUTO ID
 
     final dataToSave = {
       ...quotation,
@@ -81,7 +78,10 @@ class QuotationHistoryStore extends ChangeNotifier {
         'checkOutDate': Timestamp.fromDate(quotation['checkOutDate']),
     };
 
-    await _db.collection('quotations').doc(quotationId).update(dataToUpdate);
+    await _db
+        .collection('quotations')
+        .doc(quotationId)
+        .update(dataToUpdate);
   }
 
   /// ❌ DELETE QUOTATION
