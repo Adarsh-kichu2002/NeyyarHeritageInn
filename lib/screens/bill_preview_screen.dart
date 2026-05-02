@@ -180,6 +180,7 @@ class _BillPreviewScreenState extends State<BillPreviewScreen> {
               _totalRow('Total', data['subtotal']),
               _totalRow('GST (5%)', data['gst']),
               _totalRow('Advance', data['advance']),
+              _totalRow('Discount', data['discount']),
               const Divider(),
               _totalRow('Balance', data['balance'], bold: true),
             ],
@@ -224,8 +225,7 @@ class _BillPreviewScreenState extends State<BillPreviewScreen> {
   }
 
   /// ---------------- ACTIONS ----------------
-
- Widget _actions(BuildContext context, Map<String, dynamic> data) {
+Widget _actions(BuildContext context, Map<String, dynamic> data) {
   return Padding(
     padding: const EdgeInsets.all(12),
     child: Row(
@@ -239,13 +239,28 @@ class _BillPreviewScreenState extends State<BillPreviewScreen> {
                 : () async {
                     setState(() => _saving = true);
 
-                    // ✅ CRITICAL FIX
+                    // ✅ Generate bill ID if not exists
                     final billId = data['billId'] ??
                         DateTime.now().millisecondsSinceEpoch.toString();
+
+                    /// 🔥 CLEAN ITEMS BEFORE SAVING
+                    List<Map<String, dynamic>> cleanItems(List items) {
+                      return items.map((i) {
+                        return {
+                          'name': i['name'],
+                          'qty': i['qty'],
+                          'price': i['price'],
+                        };
+                      }).toList();
+                    }
 
                     final finalData = {
                       ...data,
                       'billId': billId,
+
+                      // ✅ Replace items with cleaned version
+                      if (data['items'] != null)
+                        'items': cleanItems(data['items']),
                     };
 
                     await context
@@ -428,6 +443,7 @@ class _BillPreviewScreenState extends State<BillPreviewScreen> {
                   _pdfTotalRow('Total', data['subtotal'], body),
                   _pdfTotalRow('GST (5%)', data['gst'], body),
                   _pdfTotalRow('Advance', data['advance'], body),
+                  _pdfTotalRow('Discount', data['discount'], body),
                   pw.Divider(),
                   _pdfTotalRow('Balance', data['balance'], bold),
                 ],

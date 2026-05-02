@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:neyyar_heritage/history/quotation_history_store.dart';
@@ -8,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
+import '../history/confirm_store.dart';
 
 class QuotationPreviewScreen extends StatefulWidget {
   const QuotationPreviewScreen({super.key});
@@ -58,6 +60,9 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen> {
 
     final rooms = data['rooms'] as List? ?? [];
     final facilities = data['facilities'] as List? ?? [];
+    final DateTime createdDate = data['createdAt'] is DateTime
+        ? data['createdAt']
+        : (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Quotation Preview')),
@@ -82,7 +87,9 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen> {
                         color: Colors.green,
                       ),
                     ),
-                    Text('Date : ${DateFormat('dd/MM/yyyy').format(DateTime.now())}'),
+                    Text(
+                    'Date : ${DateFormat('dd/MM/yyyy').format(createdDate)}'
+                   )
                   ],
                 ),
               ],
@@ -180,16 +187,36 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen> {
 
             const SizedBox(height: 24),
 
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                '+\n'
-                'GST 5%\n',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
+           const Padding(
+  padding: EdgeInsets.only(right: 20), // adjust spacing from right
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.end,
+    children: [
+      Center(
+        child: SizedBox(
+          child: Text(
+            '+',
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
             ),
+          ),
+        ),
+      ),
+      Text(
+        'GST 5%',
+        textAlign: TextAlign.right,
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    ],
+  ),
+),
 
-             const SizedBox(height: 24),
+const SizedBox(height: 24),
                 
             //Term and Conditions
             const Text('Terms and Conditions', 
@@ -207,8 +234,8 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen> {
               style: TextStyle(fontSize: 14, height: 1.3, color: Colors.red, fontWeight: FontWeight.bold),
             ),
               const Text(
-              '• If there is less than the number of members mentioned in the booking confirmation, it should be informed 2 days in advance\n'
-              '  Otherwise the full amount will have to be paid.\n'
+              '• If there is less than the number of members mentioned in the booking confirmation, it should be informed 2 days in advance'
+              'Otherwise the full amount will have to be paid.\n'
               '• Cancellation made 72 hours prior to the arrival date will receive a full refund of the advance.\n'
               '• Cancellation made within 72 hours of the arrival date will result in forfeiture of the advance.\n',
               style: TextStyle(fontSize: 14, height: 1.3, color: Colors.red, fontWeight: FontWeight.w500),
@@ -308,48 +335,71 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen> {
     icon: const Icon(Icons.save),
     label: const Text('Save & Download'),
     onPressed: () async {
-      final store = context.read<QuotationHistoryStore>();
+  final historyStore = context.read<QuotationHistoryStore>();
+  final confirmStore = context.read<ConfirmStore>();
 
-      String? timeToString(dynamic t) {
-        if (t == null) return null;
-        if (t is TimeOfDay) {
-          return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-        }
-        return t.toString();
-      }
+  String? timeToString(dynamic t) {
+    if (t == null) return null;
+    if (t is TimeOfDay) {
+      return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+    }
+    return t.toString();
+  }
 
-      /// 🔥 BUILD FINAL DATA SAFELY
-      final Map<String, dynamic> finalData = {
-        ...data,
-        'checkInTime': timeToString(data['checkInTime']),
-        'checkOutTime': timeToString(data['checkOutTime']),
-        if (data['checkInDate'] is DateTime)
-          'checkInDate': data['checkInDate'],
-        if (data['checkOutDate'] is DateTime)
-          'checkOutDate': data['checkOutDate'],
+  /// 🔥 CLEAN ROOMS
+  List<Map<String, dynamic>> cleanRooms(List rooms) {
+    return rooms.map((r) {
+      return {
+        'name': r['name'],
+        'price': r['price'],
+        'qty': r['qty'],
+        'selected': r['selected'],
       };
+    }).toList();
+  }
 
-      /// 🔥 SAVE / UPDATE
-      if (data['mode'] == 'edit' && data['quotationId'] != null) {
-        await store.updateQuotation(
-          data['quotationId'],
-          finalData,
-        );
-      } else {
-        await store.addQuotation(finalData);
-      }
+  final Map<String, dynamic> finalData = {
+    ...data,
+    if (data['rooms'] != null)
+      'rooms': cleanRooms(data['rooms']),
+    'checkInTime': timeToString(data['checkInTime']),
+    'checkOutTime': timeToString(data['checkOutTime']),
+    if (data['checkInDate'] is DateTime)
+      'checkInDate': data['checkInDate'],
+    if (data['checkOutDate'] is DateTime)
+      'checkOutDate': data['checkOutDate'],
+  };
 
-      if (!mounted) return;
+  /// 🔥 EDIT MODE
+  if (data['mode'] == 'edit' && data['quotationId'] != null) {
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Quotation saved successfully')),
-      );
+    await historyStore.updateQuotation(
+      data['quotationId'],
+      finalData,
+    );
 
-      /// ✅ AUTO PRINT / DOWNLOAD (NOT SHARE)
-      await _downloadPdf();
+    /// ✅ CRITICAL FIX — SYNC CONFIRM STORE
+    if (confirmStore.isConfirmed(data['quotationId'])) {
+      await confirmStore.syncAfterQuotationUpdate({
+        'id': data['quotationId'],
+        ...finalData,
+      });
+    }
 
-      Navigator.pop(context);
-    },
+  } else {
+    await historyStore.addQuotation(finalData);
+  }
+
+  if (!mounted) return;
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text('Quotation saved successfully')),
+  );
+
+  await _downloadPdf();
+
+  Navigator.pop(context);
+},
   ),
 ),
           ],
@@ -374,6 +424,9 @@ Future<void> _downloadPdf() async {
 
   final List rooms = data['rooms'] as List? ?? [];
   final List facilities = data['facilities'] as List? ?? [];
+    final DateTime createdDate = data['createdAt'] is DateTime
+          ? data['createdAt']
+          : (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
 
   /// Common styles (MATCH PREVIEW)
   const bodyStyle = pw.TextStyle(fontSize: 12, height: 1.2);
@@ -407,7 +460,7 @@ Future<void> _downloadPdf() async {
                   ),
                 ),
                 pw.Text(
-                  'Date : ${DateFormat('dd/MM/yyyy').format(DateTime.now())}',
+                   'Date : ${DateFormat('dd/MM/yyyy').format(createdDate)}',
                   style: bodyStyle,
                 ),
               ],
@@ -598,24 +651,38 @@ Future<void> _downloadPdf() async {
 
         pw.SizedBox(height: 10),
 
-        pw.Align(
-          alignment: pw.Alignment.centerRight,
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text(
-                '+\n'
-                'GST 5%\n',
-                style: pw.TextStyle(
-                    fontSize: 14,
-                    fontWeight: pw.FontWeight.bold,
-                    height: 1.2),
-              ),
-            ],
+        pw.Padding(
+  padding: const pw.EdgeInsets.only(right: 20),
+  child: pw.Align(
+    alignment: pw.Alignment.centerRight,
+    child: pw.Container(
+      width: 60, // 👈 adjust until perfectly matching GST width
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+        children: [
+          pw.Text(
+            '+',
+            textAlign: pw.TextAlign.center,
+            style: pw.TextStyle(
+              fontSize: 14,
+              fontWeight: pw.FontWeight.bold,
+            ),
           ),
-        ),
+          pw.Text(
+            'GST 5%',
+            textAlign: pw.TextAlign.right,
+            style: pw.TextStyle(
+              fontSize: 14,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    ),
+  ),
+),
 
-         pw.SizedBox(height: 10),
+pw.SizedBox(height: 10),
 
         // TERMS AND CONDITIONS
         pw.Align(
@@ -634,16 +701,16 @@ Future<void> _downloadPdf() async {
         pw.SizedBox(height: 6),
         pw.Text(
           '• All rates are valid for 15 days\n'
-          '• 50% advance payment is required to confirm the booking. Reservation will be allocated and confirmed on a first-come, first-served basis,'
-          'subject to receipt of the advance payment\n'
-          '• The remaining 50% is to be paid upon check-in\n'
+          '• 50% advance payment is required to confirm the booking. Reservation will be allocated and confirmed on a first-come,\n' 
+          '  first-served basis, subject to receipt of the advance payment\n'
+          '• The remaining 50% is to be paid upon check-in.\n'
           '• Food usage: Outside food is strictly not permitted inside property\n',
           style: const pw.TextStyle(fontSize: 10, height: 1.2),
         ),
         pw.Text(
           '• No Transportation Available\n'
-          '• If there is less than the number of members mentioned in the booking confirmation, it should be informed 2 days in advance\n'
-          '  Otherwise the full amount will have to be paid.\n'
+          '• If there is less than the number of members mentioned in the booking confirmation, it should be informed 2 days in\n'
+          '  advance. Otherwise the full amount will have to be paid.\n'
           '• Cancellation made 72 hours prior to the arrival date will receive a full refund of the advance.\n'
           '• Cancellation made within 72 hours of the arrival date will result in forfeiture of the advance.\n',
           style: const pw.TextStyle(fontSize: 10, height: 1.2, color: PdfColors.red),

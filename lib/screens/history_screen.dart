@@ -7,25 +7,24 @@ class HistoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const DefaultTabController(
+    return DefaultTabController(
       length: 2,
-      child: Column(
-        children: [
-          TabBar(
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('History'),
+          bottom: const TabBar(
             tabs: [
               Tab(text: 'Quotations'),
               Tab(text: 'Bills'),
             ],
           ),
-          Expanded(
-            child: TabBarView(
-              children: [
-                QuotationHistoryTab(),
-                BillHistoryTab(),
-              ],
-            ),
-          ),
-        ],
+        ),
+        body: const TabBarView(
+          children: [
+            QuotationHistoryTab(),
+            BillHistoryTab(),
+          ],
+        ),
       ),
     );
   }

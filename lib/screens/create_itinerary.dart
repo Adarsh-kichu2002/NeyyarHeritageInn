@@ -1,5 +1,7 @@
+// create_itinerary.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class CreateItineraryScreen extends StatefulWidget {
   const CreateItineraryScreen({super.key});
@@ -10,33 +12,47 @@ class CreateItineraryScreen extends StatefulWidget {
 
 class _CreateItineraryScreenState extends State<CreateItineraryScreen> {
   final _formKey = GlobalKey<FormState>();
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   bool isEdit = false;
   String? docId;
-
+  bool _initialized = false;
 
   final nameCtrl = TextEditingController();
   final mobileCtrl = TextEditingController();
+  final guideNameCtrl = TextEditingController();
+  final guidePhoneCtrl = TextEditingController();
+
+  /// PACKAGE DROPDOWN
+  final List<String> packageOptions = [
+    'DAY OUT',
+    'STAY',
+    'STAY PACKAGE',
+    'ADD'
+  ];
 
   String packageName = 'DAY OUT';
+
+  /// CONFIRMED GUESTS DROPDOWN
+  List<Map<String, dynamic>> confirmedGuests = [];
+  String? selectedGuest;
 
   DateTime date = DateTime.now();
   TimeOfDay start = const TimeOfDay(hour: 10, minute: 0);
   TimeOfDay end = const TimeOfDay(hour: 18, minute: 0);
 
+  final adultCtrl = TextEditingController();
+  final childrenCtrl = TextEditingController();
+  final childCtrl = TextEditingController();
+
   int _timeToMinutes(String time) {
-  try {
-    final dt = DateFormat('H:mm').parse(time);
-    return dt.hour * 60 + dt.minute;
-  } catch (_) {
-    return 0; // fallback if empty/invalid
+    try {
+      final dt = DateFormat('H:mm').parse(time);
+      return dt.hour * 60 + dt.minute;
+    } catch (_) {
+      return 0;
+    }
   }
-}
-
-final adultCtrl = TextEditingController();
-final childrenCtrl = TextEditingController();
-final childCtrl = TextEditingController();
-
 
   List<Map<String, TextEditingController>> items = [
     _item('Welcome Drinks (Neyyar Dam Cafe)', '10:00', '12:00'),
@@ -50,10 +66,7 @@ final childCtrl = TextEditingController();
   ];
 
   static Map<String, TextEditingController> _item(
-    String title,
-    String from,
-    String to,
-  ) {
+      String title, String from, String to) {
     return {
       'title': TextEditingController(text: title),
       'from': TextEditingController(text: from),
@@ -62,54 +75,89 @@ final childCtrl = TextEditingController();
   }
 
   int get totalPax {
-  final adult = int.tryParse(adultCtrl.text) ?? 0;
-  final children = int.tryParse(childrenCtrl.text) ?? 0;
-  final child = int.tryParse(childCtrl.text) ?? 0;
+    final adult = int.tryParse(adultCtrl.text) ?? 0;
+    final children = int.tryParse(childrenCtrl.text) ?? 0;
+    final child = int.tryParse(childCtrl.text) ?? 0;
+    return adult + children + child;
+  }
 
-  return adult + children + child;
-}
+  /// LOAD CONFIRMED GUESTS BASED ON DATE
+  Future<void> loadConfirmedGuests() async {
+    final startDate = DateTime(date.year, date.month, date.day);
+    final endDate = DateTime(date.year, date.month, date.day, 23, 59, 59);
 
+    final snap = await _db
+        .collection('confirmed_quotations')
+        .where('checkInDate', isGreaterThanOrEqualTo: startDate)
+        .where('checkInDate', isLessThanOrEqualTo: endDate)
+        .get();
 
+    confirmedGuests = snap.docs.map((d) {
+      final data = d.data();
+      return {
+        'name': data['customerName'],
+        'adult': data['adult'] ?? 0,
+        'children': data['children'] ?? 0,
+        'child': data['child'] ?? 0,
+        'phone': data['phone1'] ?? '',
+      };
+    }).toList();
+
+    setState(() {});
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    loadConfirmedGuests();
+  }
 
   @override
 void didChangeDependencies() {
   super.didChangeDependencies();
 
+  if (_initialized) return;
+
   final args =
       ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
 
-  if (args != null && args['mode'] == 'edit' && !isEdit) {
-    isEdit = true;
-    docId = args['docId'];
+  if (args != null) {
+    if (args['mode'] == 'edit') {
+      isEdit = true;
+      docId = args['docId'];
 
-    packageName = args['package'] ?? 'DAY OUT';
-    nameCtrl.text = args['name'] ?? '';
-    mobileCtrl.text = args['mobile'] ?? '';
+      nameCtrl.text = args['name'] ?? '';
+      mobileCtrl.text = args['mobile'] ?? '';
+      guideNameCtrl.text = args['guideName'] ?? '';
+      guidePhoneCtrl.text = args['guidePhone'] ?? '';
 
-    if (args['date'] is DateTime) {
-      date = args['date'];
+      adultCtrl.text = (args['adult'] ?? 0).toString();
+      childrenCtrl.text = (args['children'] ?? 0).toString();
+      childCtrl.text = (args['child'] ?? 0).toString();
+
+      packageName = args['package'] ?? 'DAY OUT';
+
+      if (args['date'] != null) {
+        date = args['date'];
+      }
+
+      /// LOAD ITINERARY ITEMS
+      if (args['items'] != null) {
+        items.clear();
+
+        for (var item in args['items']) {
+          items.add({
+            'title': TextEditingController(text: item['title']),
+            'from': TextEditingController(text: item['from']),
+            'to': TextEditingController(text: item['to']),
+          });
+        }
+      }
     }
-
-   adultCtrl.text = (args['adult'] ?? '').toString();
-   childrenCtrl.text = (args['children'] ?? '').toString();
-   childCtrl.text = (args['child'] ?? '').toString();
-
-    // Load items
-    if (args['items'] != null) {
-      items = (args['items'] as List)
-          .map<Map<String, TextEditingController>>((e) {
-        return {
-          'title': TextEditingController(text: e['title']),
-          'from': TextEditingController(text: e['from']),
-          'to': TextEditingController(text: e['to']),
-        };
-      }).toList();
-    }
-
-    setState(() {});
   }
+
+  _initialized = true;
 }
-    
 
   @override
   Widget build(BuildContext context) {
@@ -129,66 +177,148 @@ void didChangeDependencies() {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            _boxed(
-              child: TextFormField(
-                initialValue: packageName,
-                decoration: const InputDecoration(
-                  labelText: 'Package',
-                  border: InputBorder.none,
-                ),
-                onChanged: (v) => packageName = v,
+
+            /// PACKAGE DROPDOWN
+            DropdownButtonFormField<String>(
+  value: packageOptions.contains(packageName) ? packageName : null,
+  decoration: const InputDecoration(labelText: 'Package'),
+  items: packageOptions
+      .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+      .toList(),
+  onChanged: (v) async {
+    if (v == 'ADD') {
+      final ctrl = TextEditingController();
+
+      final result = await showDialog<String>(
+        context: context,
+        builder: (_) {
+          return AlertDialog(
+            title: const Text("Enter Package Name"),
+            content: TextField(controller: ctrl),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Cancel"),
               ),
-            ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, ctrl.text),
+                child: const Text("Save"),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (result != null && result.trim().isNotEmpty) {
+        setState(() {
+          if (!packageOptions.contains(result)) {
+            packageOptions.insert(packageOptions.length - 1, result);
+          }
+          packageName = result;
+        });
+      }
+    } else {
+      setState(() => packageName = v!);
+    }
+  },
+),
 
             const SizedBox(height: 12),
 
+            /// DATE
             Row(
               children: [
                 Expanded(
                   child: _boxed(
-                    onTap: _pickDate,
-                    child: Text(DateFormat('dd MMM yyyy').format(date)),
-                  ),
+                      onTap: _pickDate,
+                      child: Text(DateFormat('dd MMM yyyy').format(date))),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: _boxed(
-                    onTap: () => _pickTime(true),
-                    child: Text(start.format(context)),
-                  ),
+                      onTap: () => _pickTime(true),
+                      child: Text(start.format(context))),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: _boxed(
-                    onTap: () => _pickTime(false),
-                    child: Text(end.format(context)),
-                  ),
+                      onTap: () => _pickTime(false),
+                      child: Text(end.format(context))),
                 ),
               ],
             ),
 
             const Divider(height: 32),
 
+            /// GUEST DROPDOWN
+            DropdownButtonFormField<String>(
+              hint: const Text("Select Guest"),
+              value: selectedGuest,
+              items: [
+                ...confirmedGuests.map((g) {
+                  return DropdownMenuItem(
+                    value: g['name'],
+                    child: Text(g['name']),
+                  );
+                }),
+                const DropdownMenuItem(
+                    value: "ADD", child: Text("ADD MANUAL ENTRY"))
+              ],
+              onChanged: (v) {
+                if (v == "ADD") {
+                  setState(() {
+                    selectedGuest = null;
+                    nameCtrl.clear();
+                    mobileCtrl.clear();
+                  });
+                  return;
+                }
+
+                final guest =
+                    confirmedGuests.firstWhere((g) => g['name'] == v);
+
+                nameCtrl.text = guest['name'];
+                mobileCtrl.text = guest['phone'];
+
+                adultCtrl.text = guest['adult'].toString();
+                childrenCtrl.text = guest['children'].toString();
+                childCtrl.text = guest['child'].toString();
+
+                setState(() => selectedGuest = v);
+              },
+            ),
+
             TextFormField(
               controller: nameCtrl,
               decoration: const InputDecoration(labelText: 'Guest Name'),
-              validator: (v) =>
-                  v == null || v.isEmpty ? 'Name required' : null,
             ),
+
             TextFormField(
               controller: mobileCtrl,
-              decoration: const InputDecoration(labelText: 'Mobile Number'),
-              keyboardType: TextInputType.phone,
-              validator: (v) =>
-                  v == null || v.isEmpty ? 'Mobile required' : null,
+              decoration: const InputDecoration(labelText: 'Mobile'),
             ),
 
             const Divider(height: 32),
 
-            const Text('No. of Pax',
+            /// GUIDE DETAILS
+            const Text("Guide Details",
                 style: TextStyle(fontWeight: FontWeight.bold)),
 
-            const SizedBox(height: 8),
+            TextField(
+              controller: guideNameCtrl,
+              decoration: const InputDecoration(labelText: "Guide Name"),
+            ),
+
+            TextField(
+              controller: guidePhoneCtrl,
+              decoration: const InputDecoration(labelText: "Guide Phone"),
+            ),
+
+            const Divider(height: 32),
+
+            /// PAX
+            const Text('No. of Pax',
+                style: TextStyle(fontWeight: FontWeight.bold)),
 
             Row(
               children: [
@@ -205,8 +335,6 @@ void didChangeDependencies() {
 
             const Text('Itinerary',
                 style: TextStyle(fontWeight: FontWeight.bold)),
-
-            const SizedBox(height: 8),
 
             ...items.map(_itemRow),
 
@@ -260,7 +388,7 @@ void didChangeDependencies() {
     );
   }
 
- Widget _itemRow(Map<String, TextEditingController> item) {
+  Widget _itemRow(Map<String, TextEditingController> item) {
   return Card(
     margin: const EdgeInsets.symmetric(vertical: 4),
     child: Padding(
@@ -333,29 +461,27 @@ void didChangeDependencies() {
             })
         .toList()
       ..sort((a, b) =>
-          _timeToMinutes(a['from']!)
-              .compareTo(_timeToMinutes(b['from']!)));
+          _timeToMinutes(a['from']!).compareTo(_timeToMinutes(b['from']!)));
 
-   Navigator.pushNamed(
-  context,
-  '/itinerary_preview',
-  arguments: {
-    'package': packageName,
-    'date': date,
-    'start': start.format(context),
-    'end': end.format(context),
-    'name': nameCtrl.text,
-    'mobile': mobileCtrl.text,
-    'adult': int.parse(adultCtrl.text),
-    'children': int.parse(childrenCtrl.text),
-    'child': int.parse(childCtrl.text),
-    'items': sortedItems,
-
-    /// 🔥 VERY IMPORTANT
-    'docId': docId,
-  },
-);
-
+    Navigator.pushNamed(
+      context,
+      '/itinerary_preview',
+      arguments: {
+        'package': packageName,
+        'date': date,
+        'start': start.format(context),
+        'end': end.format(context),
+        'name': nameCtrl.text,
+        'mobile': mobileCtrl.text,
+        'adult': int.tryParse(adultCtrl.text) ?? 0,
+        'children': int.tryParse(childrenCtrl.text) ?? 0,
+        'child': int.tryParse(childCtrl.text) ?? 0,
+        'guideName': guideNameCtrl.text,
+        'guidePhone': guidePhoneCtrl.text,
+        'items': sortedItems,
+        'docId': docId,
+      },
+    );
   }
 
   Future<void> _pickDate() async {
@@ -365,7 +491,11 @@ void didChangeDependencies() {
       firstDate: DateTime.now().subtract(const Duration(days: 1)),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
-    if (d != null) setState(() => date = d);
+
+    if (d != null) {
+      setState(() => date = d);
+      loadConfirmedGuests();
+    }
   }
 
   Future<void> _pickTime(bool isStart) async {

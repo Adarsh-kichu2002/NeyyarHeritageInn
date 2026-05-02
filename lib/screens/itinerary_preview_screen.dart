@@ -1,7 +1,5 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/widgets.dart';
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -116,6 +114,11 @@ class ItineraryPreviewScreen extends StatelessWidget {
 
                   const SizedBox(height: 16),
 
+                  Text(
+                    'Guide Details: ${args['guideName'] ?? 'N/A'} '
+                    '${args['guidePhone'] ?? 'N/A'}'
+                  ),
+
                   /// TABLE
                   _buildTable(groupedItems),
 
@@ -198,6 +201,8 @@ class ItineraryPreviewScreen extends StatelessWidget {
         'adult': args['adult'],
         'children': args['children'],
         'child': args['child'],
+        'guideName': args['guideName'] ?? '',
+        'guidePhone': args['guidePhone'] ?? '',
         'items': args['items'],
         'updatedAt': FieldValue.serverTimestamp(),
       };
@@ -474,6 +479,11 @@ Future<Uint8List> _buildExactPdf(
         ),
 
         pw.SizedBox(height: 16),
+
+        /// ================= GUIDE DETAILS =================
+        pw.Text(
+          'Guide Details: ${args['guideName'] ?? 'N/A'} - ${args['guidePhone'] ?? 'N/A'}',
+        ),
 
         /// ================= TABLE HEADER =================
         pw.Row(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class BillListScreen extends StatefulWidget {
   const BillListScreen({super.key});
@@ -8,11 +9,29 @@ class BillListScreen extends StatefulWidget {
 }
 
 class _BillListScreenState extends State<BillListScreen> {
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+
   Map<String, dynamic> data = {};
   bool _initialized = false;
 
-  final advanceCtrl = TextEditingController(text: '0');
+  /// 🔴 ADVANCE (READ ONLY)
+  int advanceAmount = 0;
+
+  /// 🟢 DISCOUNT (EDITABLE)
+  final discountCtrl = TextEditingController(text: '0');
+
   final List<Map<String, dynamic>> items = [];
+
+  Map<String, dynamic> _createItem(String name, int qty, int price) {
+    return {
+      'name': name,
+      'qty': qty,
+      'price': price,
+      'nameCtrl': TextEditingController(text: name),
+      'qtyCtrl': TextEditingController(text: qty.toString()),
+      'priceCtrl': TextEditingController(text: price.toString()),
+    };
+  }
 
   /// DEFAULT ITEMS
   final List<Map<String, dynamic>> defaultItems = [
@@ -34,29 +53,37 @@ class _BillListScreenState extends State<BillListScreen> {
     data = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
     final bool isEdit = data['isEdit'] == true;
 
+    /// 🔴 GET ADVANCE FROM QUOTATION (READ ONLY)
+    advanceAmount = data['advance'] ?? 0;
+
+    /// 🟢 LOAD DISCOUNT IF EXISTS
+    discountCtrl.text = (data['discount'] ?? 0).toString();
+
     items.clear();
 
     /// ===============================
-    /// EDIT MODE → MERGE ITEMS PROPERLY
+    /// EDIT MODE
     /// ===============================
     if (isEdit && data['items'] != null) {
-      final savedItems = (data['items'] as List)
-          .map((e) => Map<String, dynamic>.from(e))
-          .toList();
+      final savedItems = (data['items'] as List).map((e) {
+        final item = Map<String, dynamic>.from(e);
+        item['nameCtrl'] = TextEditingController(text: item['name']);
+        item['qtyCtrl'] =
+            TextEditingController(text: item['qty'].toString());
+        item['priceCtrl'] =
+            TextEditingController(text: item['price'].toString());
+        return item;
+      }).toList();
 
-      advanceCtrl.text = (data['advance'] ?? 0).toString();
-
-      // Add saved items first
       items.addAll(savedItems);
 
-      // Add missing default items
       for (final defaultItem in defaultItems) {
-        final exists = savedItems.any(
-          (e) => e['name'] == defaultItem['name'],
-        );
+        final exists =
+            savedItems.any((e) => e['name'] == defaultItem['name']);
 
         if (!exists) {
-          items.add(Map<String, dynamic>.from(defaultItem));
+          items.add(_createItem(
+              defaultItem['name'], defaultItem['qty'], defaultItem['price']));
         }
       }
 
@@ -66,28 +93,32 @@ class _BillListScreenState extends State<BillListScreen> {
     /// ===============================
     /// CREATE MODE
     /// ===============================
-
     final rooms = (data['rooms'] ?? []) as List;
+
     for (final r in rooms.where((r) => r['selected'] == true)) {
-      items.add({
-        'name': r['name'],
-        'qty': r['qty'] ?? 1,
-        'price': r['price'] ?? 0,
-      });
+      items.add(_createItem(
+        r['name'],
+        r['qty'] ?? 1,
+        r['price'] ?? 0,
+      ));
     }
 
     if ((data['extraTotal'] ?? 0) > 0) {
-      items.add({
-        'name': 'Extra Persons',
-        'qty': data['extraPersons'] ?? 1,
-        'price': data['extraPersonPrice'] ?? 0,
-      });
+      items.add(_createItem(
+        'Extra Persons',
+        data['extraPersons'] ?? 1,
+        data['extraPersonPrice'] ?? 0,
+      ));
     }
 
-    items.addAll(defaultItems.map((e) => Map<String, dynamic>.from(e)));
+    items.addAll(defaultItems.map(
+        (e) => _createItem(e['name'], e['qty'], e['price'])));
   }
 
-  /// TOTALS
+  /// ===============================
+  /// CALCULATIONS
+  /// ===============================
+
   int get subtotal => items.fold(
         0,
         (s, i) =>
@@ -97,16 +128,24 @@ class _BillListScreenState extends State<BillListScreen> {
       );
 
   int get gst => (subtotal * 0.05).round();
-  int get advance => int.tryParse(advanceCtrl.text) ?? 0;
-  int get balance => subtotal + gst - advance;
+
+  int get discount => int.tryParse(discountCtrl.text) ?? 0;
+
+  /// 🔴 NEW LOGIC
+  int get balance => subtotal + gst - advanceAmount - discount;
 
   void _addItem() {
     setState(() {
-      items.add({'name': '', 'qty': 1, 'price': 0});
+      items.add(_createItem('', 1, 0));
     });
   }
 
   void _removeItem(int index) {
+    final item = items[index];
+    item['nameCtrl']?.dispose();
+    item['qtyCtrl']?.dispose();
+    item['priceCtrl']?.dispose();
+
     setState(() {
       items.removeAt(index);
     });
@@ -126,6 +165,7 @@ class _BillListScreenState extends State<BillListScreen> {
                 itemBuilder: (_, i) => _itemEditor(i),
               ),
             ),
+
             Align(
               alignment: Alignment.centerRight,
               child: TextButton.icon(
@@ -134,47 +174,81 @@ class _BillListScreenState extends State<BillListScreen> {
                 label: const Text('Add Item'),
               ),
             ),
+
             const Divider(),
+
+            /// 🔴 ADVANCE (READ ONLY)
+            _amountRow('Advance', advanceAmount),
+
+            /// 🟢 DISCOUNT FIELD
             TextField(
-              controller: advanceCtrl,
+              controller: discountCtrl,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Advance'),
+              decoration:
+                  const InputDecoration(labelText: 'Discount'),
               onChanged: (_) => setState(() {}),
             ),
+
             const SizedBox(height: 8),
+
             _amountRow('Subtotal', subtotal),
             _amountRow('GST (5%)', gst),
             _amountRow('Balance', balance, bold: true),
+
             const SizedBox(height: 12),
+
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 child: const Text('Preview Bill'),
                 onPressed: () {
-                  final previewItems = items
-                      .where((i) =>
-                          (int.tryParse(i['qty'].toString()) ?? 0) > 0)
-                      .toList();
+  final previewItems = items
+      .where((i) =>
+          (int.tryParse(i['qty'].toString()) ?? 0) > 0)
+      .map((i) => {
+            'name': i['name'],
+            'qty': int.tryParse(i['qty'].toString()) ?? 0,
+            'price': int.tryParse(i['price'].toString()) ?? 0,
+          })
+      .toList();
 
-                  Navigator.pushNamed(
-                    context,
-                    '/bill_preview',
-                    arguments: {
-                      ...data,
-                      'items': previewItems,
-                      'subtotal': subtotal,
-                      'gst': gst,
-                      'advance': advance,
-                      'balance': balance,
-                    },
-                  );
-                },
+  final billData = {
+    ...data,
+    'items': previewItems,
+    'subtotal': subtotal,
+    'gst': gst,
+    'advance': advanceAmount,
+    'discount': discount,
+    'balance': balance,
+
+    /// 🔥 VERY IMPORTANT
+    'billId': data['billId'] ??
+        DateTime.now().millisecondsSinceEpoch.toString(),
+  };
+
+  Navigator.pushNamed(
+    context,
+    '/bill_preview',
+    arguments: billData,
+  );
+},
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    for (var item in items) {
+      item['nameCtrl']?.dispose();
+      item['qtyCtrl']?.dispose();
+      item['priceCtrl']?.dispose();
+    }
+    discountCtrl.dispose();
+    super.dispose();
   }
 
   Widget _itemEditor(int index) {
@@ -187,8 +261,9 @@ class _BillListScreenState extends State<BillListScreen> {
         child: Column(
           children: [
             TextField(
-              decoration: const InputDecoration(labelText: 'Item Name'),
-              controller: TextEditingController(text: item['name']),
+              controller: item['nameCtrl'],
+              decoration:
+                  const InputDecoration(labelText: 'Item Name'),
               onChanged: (v) => item['name'] = v,
             ),
             const SizedBox(height: 6),
@@ -196,10 +271,10 @@ class _BillListScreenState extends State<BillListScreen> {
               children: [
                 Expanded(
                   child: TextField(
-                    decoration: const InputDecoration(labelText: 'Qty'),
+                    controller: item['qtyCtrl'],
+                    decoration:
+                        const InputDecoration(labelText: 'Qty'),
                     keyboardType: TextInputType.number,
-                    controller:
-                        TextEditingController(text: item['qty'].toString()),
                     onChanged: (v) {
                       item['qty'] = int.tryParse(v) ?? 0;
                       setState(() {});
@@ -209,10 +284,10 @@ class _BillListScreenState extends State<BillListScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: TextField(
-                    decoration: const InputDecoration(labelText: 'Price'),
+                    controller: item['priceCtrl'],
+                    decoration:
+                        const InputDecoration(labelText: 'Price'),
                     keyboardType: TextInputType.number,
-                    controller:
-                        TextEditingController(text: item['price'].toString()),
                     onChanged: (v) {
                       item['price'] = int.tryParse(v) ?? 0;
                       setState(() {});
@@ -220,7 +295,8 @@ class _BillListScreenState extends State<BillListScreen> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
+                  icon:
+                      const Icon(Icons.delete, color: Colors.red),
                   onPressed: () => _removeItem(index),
                 ),
               ],
@@ -231,15 +307,20 @@ class _BillListScreenState extends State<BillListScreen> {
     );
   }
 
-  Widget _amountRow(String label, int value, {bool bold = false}) {
+  Widget _amountRow(String label, int value,
+      {bool bold = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label,
-            style: TextStyle(fontWeight: bold ? FontWeight.bold : null)),
+            style: TextStyle(
+                fontWeight:
+                    bold ? FontWeight.bold : null)),
         Text(
           '₹$value',
-          style: TextStyle(fontWeight: bold ? FontWeight.bold : null),
+          style: TextStyle(
+              fontWeight:
+                  bold ? FontWeight.bold : null),
         ),
       ],
     );

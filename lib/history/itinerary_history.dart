@@ -86,21 +86,40 @@ Widget build(BuildContext context) {
         /// 📋 LIST
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
-            stream: query.snapshots(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
+  stream: query.snapshots(),
+  builder: (context, snapshot) {
 
-              if (snapshot.data!.docs.isEmpty) {
-                return const Center(child: Text('No itineraries found'));
-              }
+    if (!snapshot.hasData) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-              return ItineraryHistoryTab(
-                docs: snapshot.data!.docs,
-              );
-            },
-          ),
+    final now = DateTime.now();
+
+    final docs = snapshot.data!.docs.where((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      final date = (data['date'] as Timestamp?)?.toDate();
+
+      if (date == null) return false;
+
+      /// If NO filter → hide past
+      if (fromDate == null && toDate == null) {
+        final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
+        return now.isBefore(endOfDay);
+      }
+
+      /// If filter applied → show all
+      return true;
+    }).toList();
+
+    if (docs.isEmpty) {
+      return const Center(child: Text('No itineraries found'));
+    }
+
+    return ItineraryHistoryTab(
+      docs: docs,
+    );
+  },
+),
         ),
       ],
     ),

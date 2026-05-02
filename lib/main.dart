@@ -11,7 +11,6 @@ import 'screens/room_select_screen.dart';
 import 'screens/quotation_preview_screen.dart';
 import 'screens/history_screen.dart';
 import 'screens/quotation_history_tab.dart';
-
 import 'history/quotation_history_store.dart';
 
 import 'screens/bill_screen.dart';
@@ -19,11 +18,21 @@ import 'screens/bill_list_screen.dart';
 import 'screens/bill_preview_screen.dart';
 import 'screens/bill_history_tab.dart';
 import 'history/bill_history_store.dart';
+import 'screens/payment_screen.dart';
+import 'screens/bills_screen.dart';
 
 import 'screens/create_itinerary.dart';
 import 'screens/itinerary_preview_screen.dart';
 import 'history/itinerary_history.dart';
 import 'screens/itinerary_history_tab.dart';
+import 'screens/itinerary_screen.dart';
+
+import 'screens/confirm_screen.dart';
+import 'history/confirm_store.dart';
+
+import 'screens/room_occupancy_screen.dart';
+import 'screens/room_chart.dart';
+
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -52,6 +61,10 @@ class MyRoot extends StatelessWidget {
         ),
         ChangeNotifierProvider<BillHistoryStore>(
           create: (_) => BillHistoryStore(),
+          lazy: false,
+        ),
+        ChangeNotifierProvider<ConfirmStore>(
+          create: (_) => ConfirmStore(),
           lazy: false,
         ),
       ],
@@ -92,11 +105,19 @@ class MyApp extends StatelessWidget {
         '/bill_list': (_) => const BillListScreen(),
         '/bill_preview': (_) => const BillPreviewScreen(),
         '/bill_history_tab': (_) => const BillHistoryTab(),
+        '/payment_screen': (_) => const PaymentScreen(),
+        '/bills_screen': (_) => const BillsScreen(),
 
         '/create_itinerary': (_) => const CreateItineraryScreen(),
         '/itinerary_preview': (_) =>  const ItineraryPreviewScreen(),  
         '/itinerary_history': (_) => const ItineraryHistoryScreen(),
-        '/itinerary_history_tab': (_) => const ItineraryHistoryTab(docs: [],),
+        '/itinerary_history_tab': (_) => const ItineraryHistoryTab(docs: [], viewOnly: true,),
+        '/itinerary_screen': (_) => const ItineraryScreen(),  
+
+        '/confirm_screen': (_) => const ConfirmScreen(),
+
+        '/room_occupancy': (_) => const RoomOccupancyScreen(),
+        '/room_chart': (_) => const RoomChartScreen(),
       },
     );
   }

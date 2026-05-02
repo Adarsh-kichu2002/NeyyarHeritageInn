@@ -13,8 +13,6 @@ class BillHistoryTab extends StatefulWidget {
 class _BillHistoryTabState extends State<BillHistoryTab> {
   DateTime? from;
   DateTime? to;
-  
-  get data => null;
 
   @override
   Widget build(BuildContext context) {
@@ -38,6 +36,7 @@ class _BillHistoryTabState extends State<BillHistoryTab> {
 
     return Column(
       children: [
+        /// FILTER
         Padding(
           padding: const EdgeInsets.all(8),
           child: Row(
@@ -62,74 +61,159 @@ class _BillHistoryTabState extends State<BillHistoryTab> {
             ],
           ),
         ),
+
+        /// TABLE
         Expanded(
           child: filtered.isEmpty
               ? const Center(child: Text('No bills found'))
               : SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    columns: const [
-                      DataColumn(label: Text('SI')),
-                      DataColumn(label: Text('Invoice')),
-                      DataColumn(label: Text('Guest')),
-                      DataColumn(label: Text('Phone')),
-                      DataColumn(label: Text('Check In')),
-                      DataColumn(label: Text('Check Out')),
-                      DataColumn(label: Text('Total')),
-                      DataColumn(label: Text('Actions')),
-                    ],
-                    rows: List.generate(filtered.length, (i) {
-                      final b = filtered[i];
+                  scrollDirection: Axis.vertical,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: DataTable(
+                      columns: const [
+                        DataColumn(label: Text('SI')),
+                        DataColumn(label: Text('Invoice')),
+                        DataColumn(label: Text('Guest')),
+                        DataColumn(label: Text('Phone')),
+                        DataColumn(label: Text('Check In')),
+                        DataColumn(label: Text('Check Out')),
+                        DataColumn(label: Text('Total')),
+                        DataColumn(label: Text('Status')), // ✅ NEW
+                        DataColumn(label: Text('Actions')),
+                      ],
+                      rows: List.generate(filtered.length, (i) {
+                        final b = filtered[i];
 
-                      return DataRow(
-                        cells: [
-                          DataCell(Text('${i + 1}')),
-                          DataCell(Text('${b['invoiceNo']}')),
-                          DataCell(Text(b['customerName'] ?? '')),
-                          DataCell(Text('${b['phone1']}')),
-                          DataCell(Text(_fmt(b['checkInDate']))),
-                          DataCell(Text(_fmt(b['checkOutDate']))),
-                          DataCell(Text('₹${b['balance']}')),
-                          DataCell(
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.visibility, color: Colors.green),
-                                  onPressed: () {
-                                    Navigator.pushNamed(
-                                      context,
-                                      '/bill_preview',
-                                      arguments: b,
-                                    );
-                                  },
-                                ),
-                                // ✏️ EDIT
-    IconButton(
-  icon: const Icon(Icons.edit, color: Colors.blue),
-  onPressed: () {
-    Navigator.pushNamed(
-      context,
-      '/bill_screen',
-      arguments: {
-        ...b,
-        'isEdit': true,        // ✅ FIXED
-        'billId': b['billId'], // ✅ MUST PASS
-      },
-    );
-  },
-),
+                        /// 🔥 PAYMENT LOGIC
+                        final payment = b['payment'];
+                        final int paidAmount =
+                            payment != null ? (payment['paidAmount'] ?? 0) : 0;
+                        final int balance = b['balance'] ?? 0;
 
-                                IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red),
-                                  onPressed: () =>
-                                      _confirmDelete(context, b['billId']),
-                                ),
-                              ],
-                            ),
+                        final bool isPaid = paidAmount >= balance;
+
+                        return DataRow(
+                          /// ✅ ROW COLOR
+                          color:
+                              MaterialStateProperty.resolveWith<Color?>(
+                            (states) {
+                              if (isPaid) {
+                                return const Color.fromARGB(255, 245, 221, 8);
+                              }
+                              return null;
+                            },
                           ),
-                        ],
-                      );
-                    }),
+                          cells: [
+                            DataCell(Text('${i + 1}')),
+                            DataCell(Text('${b['invoiceNo']}')),
+                            DataCell(Text(b['customerName'] ?? '')),
+                            DataCell(Text('${b['phone1']}')),
+                            DataCell(Text(_fmt(b['checkInDate']))),
+                            DataCell(Text(_fmt(b['checkOutDate']))),
+
+                            /// ✅ TOTAL + PAID INFO
+                            DataCell(
+                              Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  Text('₹${b['balance']}'),
+                                  Text(
+                                    'Paid: ₹$paidAmount',
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            /// ✅ STATUS BADGE
+                            DataCell(
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color:
+                                      isPaid ? Colors.green : Colors.red,
+                                  borderRadius:
+                                      BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  isPaid ? 'PAID' : 'UNPAID',
+                                  style: const TextStyle(
+                                      color: Colors.white),
+                                ),
+                              ),
+                            ),
+
+                            /// ACTIONS
+                            DataCell(
+                              Row(
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.visibility,
+                                        color: Colors.green),
+                                    onPressed: () {
+                                      Navigator.pushNamed(
+                                        context,
+                                        '/bill_preview',
+                                        arguments: b,
+                                      );
+                                    },
+                                  ),
+
+                                  /// EDIT
+                                  IconButton(
+                                    icon: const Icon(Icons.edit,
+                                        color: Colors.blue),
+                                    onPressed: () {
+                                      Navigator.pushNamed(
+                                        context,
+                                        '/bill_screen',
+                                        arguments: {
+                                          ...b,
+                                          'isEdit': true,
+                                          'billId': b['billId'],
+                                        },
+                                      );
+                                    },
+                                  ),
+
+                                  /// PAYMENT
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.currency_rupee,
+                                      color: Color.fromARGB(
+                                          255, 204, 3, 239),
+                                    ),
+                                    onPressed: () {
+                                      Navigator.pushNamed(
+  context,
+  '/payment_screen',
+  arguments: {
+    ...b,
+    'isReadOnlyPayment': false, // ✅ editable
+  },
+);
+                                    },
+                                  ),
+
+                                  /// DELETE
+                                  IconButton(
+                                    icon: const Icon(Icons.delete,
+                                        color: Colors.red),
+                                    onPressed: () => _confirmDelete(
+                                        context, b['billId']),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        );
+                      }),
+                    ),
                   ),
                 ),
         ),
@@ -137,7 +221,9 @@ class _BillHistoryTabState extends State<BillHistoryTab> {
     );
   }
 
-  Future<void> _confirmDelete(BuildContext context, String billId) async {
+  /// DELETE CONFIRM
+  Future<void> _confirmDelete(
+      BuildContext context, String billId) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -161,7 +247,9 @@ class _BillHistoryTabState extends State<BillHistoryTab> {
     }
   }
 
-  Widget _dateBox(String label, DateTime? value, Function(DateTime) onPick) {
+  /// DATE PICKER
+  Widget _dateBox(
+      String label, DateTime? value, Function(DateTime) onPick) {
     return OutlinedButton(
       onPressed: () async {
         final d = await showDatePicker(
@@ -173,7 +261,9 @@ class _BillHistoryTabState extends State<BillHistoryTab> {
         if (d != null) onPick(d);
       },
       child: Text(
-        value == null ? label : DateFormat('dd/MM/yyyy').format(value),
+        value == null
+            ? label
+            : DateFormat('dd/MM/yyyy').format(value),
       ),
     );
   }

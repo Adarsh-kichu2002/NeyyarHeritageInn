@@ -129,12 +129,14 @@ bool isEdit = false;
 void didChangeDependencies() {
   super.didChangeDependencies();
 
+  if (editData != null) return; // prevent duplicate execution
+
   final args = ModalRoute.of(context)?.settings.arguments;
 
   if (args != null && args is Map<String, dynamic>) {
     mode = 'edit';
     editData = args;
-    quotationId = args['id']; // 🔥 VERY IMPORTANT
+    quotationId = args['id']; // MUST be original quotation id
     _fillFormForEdit();
   } else {
     mode = 'create';
@@ -319,7 +321,7 @@ void didChangeDependencies() {
   '/room_select_screen',
   arguments: {
     'mode': mode,
-    'quotationId': quotationId,
+    'quotationId': mode == 'edit' ? quotationId : null,
     'package': _selectedPackage == 'Add New Package'
         ? _customPackageController.text
         : _selectedPackage,

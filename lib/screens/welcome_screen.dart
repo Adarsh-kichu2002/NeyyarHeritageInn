@@ -1,13 +1,49 @@
 import 'package:flutter/material.dart';
 
-class WelcomeScreen extends StatelessWidget {
+class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
+
+  @override
+  State<WelcomeScreen> createState() => _WelcomeScreenState();
+}
+
+class _WelcomeScreenState extends State<WelcomeScreen> {
+  final TextEditingController usernameCtrl = TextEditingController();
+
+  void _login() {
+    final username = usernameCtrl.text.trim();
+
+    if (username == 'admin@neyyar') {
+      Navigator.pushReplacementNamed(
+        context,
+        '/home',
+        arguments: {'role': 'admin'},
+      );
+    } else if (username == 'staff@neyyar') {
+      Navigator.pushReplacementNamed(
+        context,
+        '/home',
+        arguments: {'role': 'staff'},
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid Username')),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    usernameCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -28,7 +64,7 @@ class WelcomeScreen extends StatelessWidget {
 
                   const SizedBox(height: 24),
 
-                  // Logo (centered)
+                  /// LOGO
                   ConstrainedBox(
                     constraints: BoxConstraints(
                       maxWidth: screenWidth * 0.55,
@@ -41,13 +77,25 @@ class WelcomeScreen extends StatelessWidget {
 
                   const SizedBox(height: 40),
 
-                  // Continue Button
+                  /// USERNAME FIELD
+                  TextField(
+                    controller: usernameCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Username',
+                      hintText: 'Enter username',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  /// LOGIN BUTTON
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pushReplacementNamed(context, '/home');
-                      },
+                      onPressed: _login,
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
@@ -55,8 +103,11 @@ class WelcomeScreen extends StatelessWidget {
                         ),
                       ),
                       child: const Text(
-                        'Continue',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 77, 13, 238)),
+                        'Login',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
