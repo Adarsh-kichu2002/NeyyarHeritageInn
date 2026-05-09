@@ -127,12 +127,25 @@ class _BillListScreenState extends State<BillListScreen> {
                 (int.tryParse(i['price'].toString()) ?? 0)),
       );
 
-  int get gst => (subtotal * 0.05).round();
+  /// Discount
+int get discount =>
+    int.tryParse(discountCtrl.text) ?? 0;
 
-  int get discount => int.tryParse(discountCtrl.text) ?? 0;
+/// Amount after discount
+int get discountedSubtotal {
+  final amount = subtotal - discount;
 
-  /// 🔴 NEW LOGIC
-  int get balance => subtotal + gst - advanceAmount - discount;
+  /// Prevent negative values
+  return amount < 0 ? 0 : amount;
+}
+
+/// GST after discount
+int get gst =>
+    (discountedSubtotal * 0.05).round();
+
+/// Final balance
+int get balance =>
+    discountedSubtotal + gst - advanceAmount;
 
   void _addItem() {
     setState(() {

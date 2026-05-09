@@ -1,0 +1,826 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+
+import 'package:printing/printing.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:sticky_headers/sticky_headers.dart';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+
+import '../history/bill_history_store.dart';
+
+class ReportsScreen extends StatefulWidget {
+  const ReportsScreen({super.key});
+
+  @override
+  State<ReportsScreen> createState() => _ReportsScreenState();
+}
+
+class _ReportsScreenState extends State<ReportsScreen> {
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  DateTime? from;
+  DateTime? to;
+
+  String selectedPackage = 'All';
+  String selectedMonth = 'All';
+  String selectedYear = 'All';
+
+  final List<String> packages = [
+    'All',
+    'Stay',
+    'Stay Package',
+    'Day Out Package',
+    'Others',
+  ];
+
+  final List<String> months = [
+    'All',
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+    '7',
+    '8',
+    '9',
+    '10',
+    '11',
+    '12',
+  ];
+
+  final List<String> years = [
+    'All',
+    '2026',
+    '2027',
+    '2028',
+    '2029',
+    '2030',
+    '2031',
+    '2032',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final store = context.watch<BillHistoryStore>();
+
+    if (store.isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    final filteredBills = store.bills.where((bill) {
+      final payment = bill['payment'];
+
+      final paidAmount =
+          payment != null ? (payment['paidAmount'] ?? 0) : 0;
+
+      /// ONLY PAID BILLS
+      if (paidAmount <= 0) {
+        return false;
+      }
+
+      final DateTime? checkOut = bill['checkOutDate'];
+
+      if (checkOut == null) {
+        return false;
+      }
+
+      /// DATE FILTER
+      if (from != null &&
+          checkOut.isBefore(_startOfDay(from!))) {
+        return false;
+      }
+
+      if (to != null &&
+          checkOut.isAfter(_endOfDay(to!))) {
+        return false;
+      }
+
+      /// PACKAGE FILTER
+      if (selectedPackage != 'All') {
+        final packageName =
+            (bill['package'] ?? 'Others').toString();
+
+        if (packageName != selectedPackage) {
+          return false;
+        }
+      }
+
+      /// MONTH FILTER
+      if (selectedMonth != 'All') {
+        if (checkOut.month !=
+            int.parse(selectedMonth)) {
+          return false;
+        }
+      }
+
+      /// YEAR FILTER
+      if (selectedYear != 'All') {
+        if (checkOut.year !=
+            int.parse(selectedYear)) {
+          return false;
+        }
+      }
+
+      return true;
+    }).toList();
+
+    final int totalBill = filteredBills.fold(
+      0,
+      (sum, bill) => sum + _toInt(bill['balance']),
+    );
+
+    final int totalAdvance = filteredBills.fold(
+      0,
+      (sum, bill) => sum + _toInt(bill['advance']),
+    );
+
+    final int totalPaid = filteredBills.fold(
+      0,
+      (sum, bill) {
+        final payment = bill['payment'];
+
+        final paid =
+            payment != null ? payment['paidAmount'] : 0;
+
+        return sum + _toInt(paid);
+      },
+    );
+
+    final int netTotal =
+        totalAdvance + totalPaid;
+
+    /// MONTHLY BREAKUP
+    Map<String, int> monthlyBreakup = {};
+
+    for (var bill in filteredBills) {
+      final date = bill['checkOutDate'];
+
+      final payment = bill['payment'];
+
+      final paid =
+          payment != null ? payment['paidAmount'] : 0;
+
+      final monthKey =
+          DateFormat('MMMM yyyy').format(date);
+
+      monthlyBreakup[monthKey] =
+          (monthlyBreakup[monthKey] ?? 0) +
+              _toInt(paid);
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+
+      appBar: AppBar(
+        title: const Text("Reports"),
+      ),
+
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.all(12),
+        child: ElevatedButton.icon(
+          onPressed: () => _downloadPdf(
+            filteredBills,
+            totalBill,
+            totalAdvance,
+            totalPaid,
+            netTotal,
+            monthlyBreakup,
+          ),
+          icon: const Icon(Icons.download),
+          label: const Text("Download PDF"),
+        ),
+      ),
+
+      body: Column(
+        children: [
+
+          /// FILTERS
+          Padding(
+            padding: const EdgeInsets.all(10),
+            child: Column(
+              children: [
+
+                Row(
+                  children: [
+                    _dateBox(
+                      "From",
+                      from,
+                      (d) {
+                        setState(() {
+                          from = d;
+                        });
+                      },
+                    ),
+
+                    const SizedBox(width: 8),
+
+                    _dateBox(
+                      "To",
+                      to,
+                      (d) {
+                        setState(() {
+                          to = d;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 10),
+
+                Row(
+                  children: [
+
+                    Expanded(
+                      child: _dropdown(
+                        selectedPackage,
+                        packages,
+                        (v) {
+                          setState(() {
+                            selectedPackage = v!;
+                          });
+                        },
+                      ),
+                    ),
+
+                    const SizedBox(width: 8),
+
+                    Expanded(
+                      child: _dropdown(
+                        selectedMonth,
+                        months,
+                        (v) {
+                          setState(() {
+                            selectedMonth = v!;
+                          });
+                        },
+                      ),
+                    ),
+
+                    const SizedBox(width: 8),
+
+                    Expanded(
+                      child: _dropdown(
+                        selectedYear,
+                        years,
+                        (v) {
+                          setState(() {
+                            selectedYear = v!;
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          /// TABLE WITH STICKY MONTH HEADER
+Expanded(
+  child: ListView(
+    children: monthlyBreakup.keys.map((monthKey) {
+      final monthBills = filteredBills.where((bill) {
+        final date = bill['checkOutDate'];
+
+        final billMonth = DateFormat(
+          'MMMM yyyy',
+        ).format(date);
+
+        return billMonth == monthKey;
+      }).toList();
+
+      /// MONTH NET TOTAL
+      final int monthAdvance = monthBills.fold(
+        0,
+        (sum, bill) => sum + _toInt(bill['advance']),
+      );
+
+      final int monthPaid = monthBills.fold(
+        0,
+        (sum, bill) {
+          final payment = bill['payment'];
+
+          final paid = payment != null
+              ? payment['paidAmount']
+              : 0;
+
+          return sum + _toInt(paid);
+        },
+      );
+
+      final int monthNetTotal =
+          monthAdvance + monthPaid;
+
+      return StickyHeader(
+        header: Container(
+          height: 50,
+          color: Colors.blue,
+          padding:
+              const EdgeInsets.symmetric(
+            horizontal: 16,
+          ),
+          child: Row(
+            mainAxisAlignment:
+                MainAxisAlignment
+                    .spaceBetween,
+            children: [
+              Text(
+                monthKey,
+                style:
+                    const TextStyle(
+                  color:
+                      Colors.white,
+                  fontWeight:
+                      FontWeight.bold,
+                ),
+              ),
+
+              /// NET TOTAL IN HEADER
+              Text(
+                '₹$monthNetTotal',
+                style:
+                    const TextStyle(
+                  color:
+                      Colors.white,
+                  fontWeight:
+                      FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        content: SingleChildScrollView(
+          scrollDirection:
+              Axis.horizontal,
+          child: DataTable(
+            columns: const [
+              DataColumn(
+                label: Text(
+                  "Invoice No",
+                  style: TextStyle(
+                    fontWeight:
+                        FontWeight.bold,
+                  ),
+                ),
+              ),
+              DataColumn(
+                label: Text(
+                  "Date",
+                  style: TextStyle(
+                    fontWeight:
+                        FontWeight.bold,
+                  ),
+                ),
+              ),
+              DataColumn(
+                label: Text(
+                  "Guest Name",
+                  style: TextStyle(
+                    fontWeight:
+                        FontWeight.bold,
+                  ),
+                ),
+              ),
+              DataColumn(
+                label: Text(
+                  "Package",
+                  style: TextStyle(
+                    fontWeight:
+                        FontWeight.bold,
+                  ),
+                ),
+              ),
+              DataColumn(
+                label: Text(
+                  "Bill Amount",
+                  style: TextStyle(
+                    fontWeight:
+                        FontWeight.bold,
+                  ),
+                ),
+              ),
+              DataColumn(
+                label: Text(
+                  "Paid Amount",
+                  style: TextStyle(
+                    fontWeight:
+                        FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+
+            rows: monthBills.map((bill) {
+              final payment =
+                  bill['payment'];
+
+              final paid =
+                  payment != null
+                      ? payment[
+                              'paidAmount'] ??
+                          0
+                      : 0;
+
+              return DataRow(
+                cells: [
+                  DataCell(
+                    Text(
+                      '${bill['invoiceNo']}',
+                    ),
+                  ),
+
+                  DataCell(
+                    Text(
+                      _fmt(
+                        bill[
+                            'checkOutDate'],
+                      ),
+                    ),
+                  ),
+
+                  DataCell(
+                    Text(
+                      '${bill['customerName']}',
+                    ),
+                  ),
+
+                  DataCell(
+                    Text(
+                      '${bill['package'] ?? 'Others'}',
+                    ),
+                  ),
+
+                  DataCell(
+                    Text(
+                      '₹${bill['balance']}',
+                    ),
+                  ),
+
+                  DataCell(
+                    Text(
+                      '₹$paid',
+                    ),
+                  ),
+                ],
+              );
+            }).toList(),
+          ),
+        ),
+      );
+    }).toList(),
+  ),
+),
+
+          /// MONTHLY BREAKUP
+          Container(
+            color: Colors.grey.shade100,
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              children: [
+
+                _totalRow(
+                  "Total Advance",
+                  totalAdvance,
+                ),
+
+                _totalRow(
+                  "Total Bill Amount",
+                  totalBill,
+                ),
+
+                _totalRow(
+                  "Total Paid",
+                  totalPaid,
+                ),
+
+                _totalRow(
+                  "Net Total",
+                  netTotal,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _downloadPdf(
+  List<Map<String, dynamic>> bills,
+  int totalBill,
+  int totalAdvance,
+  int totalPaid,
+  int netTotal,
+  Map<String, int> monthlyBreakup,
+) async {
+  try {
+    debugPrint("STEP 1: Loading fonts...");
+
+    final fontRegular = pw.Font.ttf(
+      await rootBundle.load(
+        'assets/fonts/Roboto-Regular.ttf',
+      ),
+    );
+
+    final fontBold = pw.Font.ttf(
+      await rootBundle.load(
+        'assets/fonts/Roboto-Bold.ttf',
+      ),
+    );
+
+    debugPrint("STEP 2: Fonts loaded");
+
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.MultiPage(
+        theme: pw.ThemeData.withFont(
+          base: fontRegular,
+          bold: fontBold,
+        ),
+        build: (context) {
+          return [
+            pw.Text(
+              "Neyyar Heritage Reports",
+              style: pw.TextStyle(
+                fontSize: 18,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+
+            pw.SizedBox(height: 20),
+
+            pw.Table.fromTextArray(
+              headers: [
+                'Bill',
+                'Date',
+                'Guest',
+                'Package',
+                'Bill',
+                'Paid',
+              ],
+              data: bills.map((bill) {
+                final payment = bill['payment'];
+
+                final paid =
+                    payment != null
+                        ? payment['paidAmount'] ?? 0
+                        : 0;
+
+                return [
+                  '${bill['invoiceNo']}',
+                  _fmt(bill['checkOutDate']),
+                  '${bill['customerName']}',
+                  '${bill['package'] ?? 'Others'}',
+                  'Rs ${bill['balance']}',
+                  'Rs $paid',
+                ];
+              }).toList(),
+            ),
+
+            pw.SizedBox(height: 20),
+
+            ...monthlyBreakup.entries.map(
+              (e) => pw.Row(
+                mainAxisAlignment:
+                    pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(e.key),
+                  pw.Text("Rs ${e.value}"),
+                ],
+              ),
+            ),
+
+            pw.Divider(),
+
+            pw.Text("Total Advance : Rs $totalAdvance"),
+            pw.Text("Total Bill : Rs $totalBill"),
+            pw.Text("Total Paid : Rs $totalPaid"),
+            pw.Text("Net Total : Rs $netTotal"),
+          ];
+        },
+      ),
+    );
+
+    debugPrint("STEP 3: PDF created");
+
+    /// OPEN PDF FIRST
+    await Printing.layoutPdf(
+      onLayout: (_) async => pdf.save(),
+    );
+
+    debugPrint("STEP 4: PDF opened");
+
+    /// SAVE TEMP FILE
+    final dir =
+        await getTemporaryDirectory();
+
+    final file = File(
+      '${dir.path}/report.pdf',
+    );
+
+    await file.writeAsBytes(
+      await pdf.save(),
+    );
+
+    debugPrint("STEP 5: File saved");
+
+    /// FIREBASE STORAGE
+    final ref =
+        FirebaseStorage.instance
+            .ref()
+            .child(
+              'reports/report_${DateTime.now().millisecondsSinceEpoch}.pdf',
+            );
+
+    await ref.putFile(file);
+
+    final url =
+        await ref.getDownloadURL();
+
+    debugPrint("STEP 6: Uploaded");
+
+    await _db.collection('reports').add({
+      'pdfUrl': url,
+      'createdAt':
+          FieldValue.serverTimestamp(),
+    });
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          "Report created successfully",
+        ),
+      ),
+    );
+  } catch (e, stack) {
+    debugPrint("PDF ERROR = $e");
+    debugPrint("$stack");
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          "PDF Error: $e",
+        ),
+      ),
+    );
+  }
+}
+
+  Widget _dropdown(
+  String value,
+  List<String> list,
+  Function(String?) onChanged,
+) {
+  return DropdownButtonFormField<String>(
+    isExpanded: true, // ✅ FIX
+    value: value,
+    decoration: const InputDecoration(
+      border: OutlineInputBorder(),
+      contentPadding: EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 12,
+      ),
+    ),
+    items: list.map((e) {
+      return DropdownMenuItem<String>(
+        value: e,
+        child: Text(
+          e,
+          overflow: TextOverflow.ellipsis, // ✅ FIX
+          maxLines: 1,
+        ),
+      );
+    }).toList(),
+    onChanged: onChanged,
+  );
+}
+
+  Widget _dateBox(
+    String label,
+    DateTime? value,
+    Function(DateTime) onPick,
+  ) {
+    return OutlinedButton(
+      onPressed: () async {
+
+        final d =
+            await showDatePicker(
+          context: context,
+          firstDate:
+              DateTime(2020),
+          lastDate:
+              DateTime(2100),
+          initialDate:
+              value ??
+                  DateTime.now(),
+        );
+
+        if (d != null) {
+          onPick(d);
+        }
+      },
+      child: Text(
+        value == null
+            ? label
+            : DateFormat(
+                'dd/MM/yyyy',
+              ).format(value),
+      ),
+    );
+  }
+
+  Widget _totalRow(
+    String label,
+    int amount,
+  ) {
+    return Row(
+      mainAxisAlignment:
+          MainAxisAlignment
+              .spaceBetween,
+      children: [
+
+        Text(
+          label,
+          style:
+              const TextStyle(
+            fontWeight:
+                FontWeight.bold,
+          ),
+        ),
+
+        Text(
+          '₹$amount',
+          style:
+              const TextStyle(
+            fontWeight:
+                FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _fmt(
+    DateTime? d,
+  ) {
+    if (d == null) {
+      return '';
+    }
+
+    return DateFormat(
+      'dd/MM/yyyy',
+    ).format(d);
+  }
+
+  int _toInt(
+    dynamic value,
+  ) {
+    return int.tryParse(
+          value?.toString() ?? '0',
+        ) ??
+        0;
+  }
+
+  DateTime _startOfDay(
+    DateTime d,
+  ) {
+    return DateTime(
+      d.year,
+      d.month,
+      d.day,
+    );
+  }
+
+  DateTime _endOfDay(
+    DateTime d,
+  ) {
+    return DateTime(
+      d.year,
+      d.month,
+      d.day,
+      23,
+      59,
+      59,
+    );
+  }
+}

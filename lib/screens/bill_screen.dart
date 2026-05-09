@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class BillScreen extends StatefulWidget {
   const BillScreen({super.key});
@@ -7,6 +8,8 @@ class BillScreen extends StatefulWidget {
   @override
   State<BillScreen> createState() => _BillScreenState();
 }
+final FirebaseFirestore _db =
+    FirebaseFirestore.instance;
 
 class _BillScreenState extends State<BillScreen> {
   Map<String, dynamic> billData = {};
@@ -22,43 +25,99 @@ class _BillScreenState extends State<BillScreen> {
   bool _initialized = false;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_initialized) return;
-    _initialized = true;
+void didChangeDependencies() {
+  super.didChangeDependencies();
 
-    final args =
-        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+  if (_initialized) return;
+  _initialized = true;
 
-    billData = args ?? {};
+  _loadBillData();
+}
 
-    // ✅ Correct edit flag
-    isEdit = billData['isEdit'] == true;
+Future<void> _loadBillData() async {
+  final args =
+      ModalRoute.of(context)?.settings.arguments
+          as Map<String, dynamic>?;
 
-    // ✅ Preserve billId if editing
-    if (isEdit && billData['billId'] != null) {
-      billData['billId'] = billData['billId'];
+  billData = args ?? {};
+
+  isEdit = billData['isEdit'] == true;
+
+  /// Preserve billId in edit mode
+  if (isEdit && billData['billId'] != null) {
+    billData['billId'] =
+        billData['billId'];
+  }
+
+  /// TEXT VALUES
+  _nameCtrl.text =
+      billData['customerName'] ?? '';
+
+  _phoneCtrl.text =
+      billData['phone1'] ?? '';
+
+  /// =========================
+  /// INVOICE NUMBER LOGIC
+  /// =========================
+
+  if (isEdit) {
+    /// Keep same invoice in edit
+    _invoiceCtrl.text =
+        billData['invoiceNo']
+                ?.toString() ??
+            '';
+  } else {
+    /// Auto-generate for new bill
+    final snapshot =
+        await _db
+            .collection('bills')
+            .orderBy(
+              'invoiceNo',
+              descending: true,
+            )
+            .limit(1)
+            .get();
+
+    int nextInvoice = 19;
+
+    if (snapshot.docs.isNotEmpty) {
+      final lastInvoice =
+          int.tryParse(
+                snapshot
+                    .docs
+                    .first['invoiceNo']
+                    .toString(),
+              ) ??
+              18;
+
+      nextInvoice =
+          lastInvoice + 1;
     }
 
-    // =========================
-    // TEXT FIELD INITIALIZATION
-    // =========================
-    _nameCtrl.text = billData['customerName'] ?? '';
-    _phoneCtrl.text = billData['phone1'] ?? '';
-
     _invoiceCtrl.text =
-        billData['invoiceNo']?.toString() ??
-            DateTime.now().millisecondsSinceEpoch.toString();
-
-    // =========================
-    // SAFE DATE HANDLING
-    // =========================
-    checkIn = _parseDate(billData['checkInDate']);
-    checkOut = _parseDate(billData['checkOutDate']);
-
-    checkIn ??= DateTime.now();
-    checkOut ??= DateTime.now().add(const Duration(days: 1));
+        nextInvoice.toString();
   }
+
+  /// DATE HANDLING
+  checkIn = _parseDate(
+    billData['checkInDate'],
+  );
+
+  checkOut = _parseDate(
+    billData['checkOutDate'],
+  );
+
+  checkIn ??= DateTime.now();
+
+  checkOut ??=
+      DateTime.now().add(
+    const Duration(days: 1),
+  );
+
+  if (mounted) {
+    setState(() {});
+  }
+}
 
   DateTime? _parseDate(dynamic value) {
     if (value == null) return null;

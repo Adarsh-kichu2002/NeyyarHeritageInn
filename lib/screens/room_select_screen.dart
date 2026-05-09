@@ -86,7 +86,7 @@ void didChangeDependencies() {
       ? List<String>.from(quotationData['facilities'])
       : [
           'Welcome Drinks',
-          'Medium Pool (2 Hrs)',
+          'Pool (2 Hrs)',
           'Waterfall & Rain Dance (30 minutes)',
           'Children Play Area',
           'Breakfast (Next Day)',

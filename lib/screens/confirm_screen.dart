@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:neyyar_heritage/history/confirm_store.dart';
 import 'package:provider/provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ConfirmScreen extends StatefulWidget {
   const ConfirmScreen({super.key});
@@ -26,22 +25,41 @@ class _ConfirmScreenState extends State<ConfirmScreen> {
     }
 
     final filtered = store.confirmedQuotations.where((q) {
-      final DateTime? created = q['createdAt']; // 🔥 FIXED KEY
+  final DateTime? checkInDate = q['checkInDate'];
 
-      if (created == null) return false;
+  if (checkInDate == null) return false;
 
-      if (from != null &&
-          created.isBefore(DateTime(from!.year, from!.month, from!.day))) {
-        return false;
-      }
+  /// From date filter
+  if (from != null) {
+    final fromDate = DateTime(
+      from!.year,
+      from!.month,
+      from!.day,
+    );
 
-      if (to != null &&
-          created.isAfter(DateTime(to!.year, to!.month, to!.day, 23, 59, 59))) {
-        return false;
-      }
+    if (checkInDate.isBefore(fromDate)) {
+      return false;
+    }
+  }
 
-      return true;
-    }).toList();
+  /// To date filter
+  if (to != null) {
+    final toDate = DateTime(
+      to!.year,
+      to!.month,
+      to!.day,
+      23,
+      59,
+      59,
+    );
+
+    if (checkInDate.isAfter(toDate)) {
+      return false;
+    }
+  }
+
+  return true;
+}).toList();
 
     return Scaffold(
       appBar: AppBar(

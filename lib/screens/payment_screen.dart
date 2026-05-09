@@ -79,12 +79,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
   /// SAVE PAYMENT
   /// =========================
   Future<void> _savePayment() async {
-    if (!isValid) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter correct amount')),
-      );
-      return;
-    }
+    // if (!isValid) {
+     // ScaffoldMessenger.of(context).showSnackBar(
+     // const SnackBar(content: Text('Enter correct amount')),
+     // );
+      // return;
+   // }
 
     setState(() => _saving = true);
 

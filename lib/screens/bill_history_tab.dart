@@ -86,12 +86,15 @@ class _BillHistoryTabState extends State<BillHistoryTab> {
                         final b = filtered[i];
 
                         /// 🔥 PAYMENT LOGIC
-                        final payment = b['payment'];
-                        final int paidAmount =
-                            payment != null ? (payment['paidAmount'] ?? 0) : 0;
-                        final int balance = b['balance'] ?? 0;
+final payment = b['payment'];
 
-                        final bool isPaid = paidAmount >= balance;
+final int paidAmount =
+    payment != null ? (payment['paidAmount'] ?? 0) : 0;
+
+/// ✅ NEW LOGIC
+/// If any amount is entered → PAID
+/// If no amount entered → UNPAID
+final bool isPaid = paidAmount > 0;
 
                         return DataRow(
                           /// ✅ ROW COLOR

@@ -107,6 +107,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     icon: Icons.bar_chart_outlined,
                     title: 'Room Charts',
                     route: '/room_chart'),
+
+                _actionBox(context,
+                    icon: Icons.assessment_outlined,
+                    title: 'Reports',
+                    route: '/reports_screen'),     
               ],
             ),
           ),
