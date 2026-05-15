@@ -218,110 +218,490 @@ class _BillsScreenState extends State<BillsScreen> {
     );
   }
 
-  /// PDF DOWNLOAD
   Future<void> _downloadBillsPdf(
-    DateTime startDate,
-    DateTime endDate,
-  ) async {
-    final store = context.read<BillHistoryStore>();
+  DateTime startDate,
+  DateTime endDate,
+) async {
+  final store = context.read<BillHistoryStore>();
 
-    final bills = store.bills.where((bill) {
-      final DateTime? checkOut =
-          bill['checkOutDate'];
+  final bills = store.bills.where((bill) {
+    final DateTime? checkOut = bill['checkOutDate'];
 
-      if (checkOut == null) {
-        return false;
-      }
+    if (checkOut == null) return false;
 
-      return !checkOut.isBefore(startDate) &&
-          !checkOut.isAfter(endDate);
-    }).toList();
+    return !checkOut.isBefore(startDate) &&
+        !checkOut.isAfter(endDate);
+  }).toList();
 
-    if (bills.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'No bills found',
-          ),
+  if (bills.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('No bills found'),
+      ),
+    );
+    return;
+  }
+
+  /// LOAD ASSETS
+  final fontRegular = pw.Font.ttf(
+    await rootBundle.load(
+      'assets/fonts/Roboto-Regular.ttf',
+    ),
+  );
+
+  final fontBold = pw.Font.ttf(
+    await rootBundle.load(
+      'assets/fonts/Roboto-Bold.ttf',
+    ),
+  );
+
+  final logoBytes = (
+    await rootBundle.load(
+      'assets/images/neyyar_logo.png',
+    )
+  ).buffer.asUint8List();
+
+  final pdf = pw.Document();
+
+  final green = PdfColor.fromInt(
+    const Color.fromARGB(
+      255,
+      52,
+      191,
+      59,
+    ).value,
+  );
+
+  for (final data in bills) {
+    final items =
+        data['items'] as List? ?? [];
+
+    final bodyStyle =
+        const pw.TextStyle(
+      fontSize: 12,
+      height: 1.4,
+    );
+
+    final boldStyle =
+        pw.TextStyle(
+      fontSize: 12,
+      height: 1.4,
+      fontWeight:
+          pw.FontWeight.bold,
+    );
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat:
+            PdfPageFormat.a4,
+
+        margin:
+            const pw.EdgeInsets.all(
+          24,
         ),
-      );
 
-      return;
-    }
+        theme:
+            pw.ThemeData.withFont(
+          base: fontRegular,
+          bold: fontBold,
+        ),
 
-    final fontRegular = pw.Font.ttf(
-      await rootBundle.load(
-        'assets/fonts/Roboto-Regular.ttf',
-      ),
-    );
+        build: (_) {
+          return [
+            /// HEADER
+            pw.Row(
+              crossAxisAlignment:
+                  pw.CrossAxisAlignment
+                      .start,
 
-    final fontBold = pw.Font.ttf(
-      await rootBundle.load(
-        'assets/fonts/Roboto-Bold.ttf',
-      ),
-    );
+              children: [
+                pw.Image(
+                  pw.MemoryImage(
+                    logoBytes,
+                  ),
+                  height: 90,
+                ),
 
-    final pdf = pw.Document();
+                pw.Spacer(),
 
-    for (final bill in bills) {
-      pdf.addPage(
-        pw.MultiPage(
-          pageFormat: PdfPageFormat.a4,
+                pw.Column(
+                  crossAxisAlignment:
+                      pw.CrossAxisAlignment
+                          .end,
 
-          theme: pw.ThemeData.withFont(
-            base: fontRegular,
-            bold: fontBold,
-          ),
+                  children: [
+                    pw.Text(
+                      'Invoice: ${data['invoiceNo'] ?? ''}',
 
-          build: (_) {
-            return [
-              pw.Text(
-                'Invoice: ${bill['invoiceNo']}',
-                style: pw.TextStyle(
+                      style:
+                          pw.TextStyle(
+                        color:
+                            green,
+
+                        fontWeight:
+                            pw.FontWeight.bold,
+
+                        fontSize:
+                            13,
+                      ),
+                    ),
+
+                    pw.Text(
+                      'Date: ${_fmt(data['checkOutDate'])}',
+
+                      style:
+                          pw.TextStyle(
+                        color:
+                            green,
+                        fontSize:
+                            12,
+                      ),
+                    ),
+
+                    pw.Text(
+                      'GST NO: 32BUMPR0206G1ZX',
+
+                      style:
+                          pw.TextStyle(
+                        color:
+                            green,
+                        fontSize:
+                            12,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+
+            pw.SizedBox(
+              height: 16,
+            ),
+
+            /// RECEIPT TITLE
+            pw.Center(
+              child: pw.Text(
+                'RECEIPT',
+
+                style:
+                    pw.TextStyle(
+                  color: green,
+
+                  fontSize:
+                      20,
+
                   fontWeight:
                       pw.FontWeight.bold,
                 ),
               ),
+            ),
 
-              pw.SizedBox(height: 10),
+            pw.SizedBox(
+              height: 16,
+            ),
 
-              pw.Text(
-                'Guest: ${bill['customerName']}',
-              ),
+            /// PARTY INFO
+            pw.Row(
+              children: [
+                pw.Expanded(
+                  child:
+                      pw.Column(
+                    crossAxisAlignment:
+                        pw.CrossAxisAlignment
+                            .start,
 
-              pw.Text(
-                'Phone: ${bill['phone1']}',
-              ),
+                    children: [
+                      pw.Text(
+                        data['customerName'] ??
+                            '',
 
-              pw.Text(
-                'Check In: ${_fmt(bill['checkInDate'])}',
-              ),
+                        style:
+                            boldStyle,
+                      ),
 
-              pw.Text(
-                'Check Out: ${_fmt(bill['checkOutDate'])}',
-              ),
+                      pw.Text(
+                        'Mob: ${data['phone1'] ?? ''}',
 
-              pw.Divider(),
-
-              pw.Text(
-                'Balance: ₹${bill['balance']}',
-                style: pw.TextStyle(
-                  fontWeight:
-                      pw.FontWeight.bold,
+                        style:
+                            bodyStyle,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ];
-          },
-        ),
-      );
-    }
 
-    await Printing.layoutPdf(
-      onLayout: (_) async {
-        return pdf.save();
-      },
+                pw.Expanded(
+                  child:
+                      pw.Column(
+                    crossAxisAlignment:
+                        pw.CrossAxisAlignment
+                            .end,
+
+                    children: [
+                      pw.Text(
+                        'Check In: ${_fmt(data['checkInDate'])}',
+
+                        style:
+                            bodyStyle,
+                      ),
+
+                      pw.Text(
+                        'Check Out: ${_fmt(data['checkOutDate'])}',
+
+                        style:
+                            bodyStyle,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            pw.SizedBox(
+              height: 20,
+            ),
+
+            /// ITEMS TABLE
+            pw.Table(
+              border:
+                  pw.TableBorder.all(
+                color:
+                    PdfColors.grey,
+              ),
+
+              columnWidths:
+                  const {
+                0: pw
+                    .FlexColumnWidth(
+                        3),
+                1: pw
+                    .FlexColumnWidth(
+                        2),
+                2: pw
+                    .FlexColumnWidth(
+                        2),
+                3: pw
+                    .FlexColumnWidth(
+                        2),
+              },
+
+              children: [
+                pw.TableRow(
+                  decoration:
+                      pw.BoxDecoration(
+                    color:
+                        green,
+                  ),
+
+                  children: [
+                    _pdfHeaderCell(
+                      'Description',
+                    ),
+                    _pdfHeaderCell(
+                      'Price',
+                    ),
+                    _pdfHeaderCell(
+                      'Qty',
+                    ),
+                    _pdfHeaderCell(
+                      'Total',
+                    ),
+                  ],
+                ),
+
+                ...items.map(
+                  (i) {
+                    final qty =
+                        int.tryParse(
+                              i['qty']
+                                      ?.toString() ??
+                                  '',
+                            ) ??
+                            0;
+
+                    final price =
+                        int.tryParse(
+                              i['price']
+                                      ?.toString() ??
+                                  '',
+                            ) ??
+                            0;
+
+                    return pw
+                        .TableRow(
+                      children: [
+                        _pdfCell(
+                          i['name'] ??
+                              '',
+                        ),
+
+                        _pdfCell(
+                          '₹$price',
+                        ),
+
+                        _pdfCell(
+                          '$qty',
+                        ),
+
+                        _pdfCell(
+                          '₹${qty * price}',
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+
+            pw.SizedBox(
+              height: 20,
+            ),
+
+            /// SUMMARY
+            pw.Row(
+              crossAxisAlignment:
+                  pw.CrossAxisAlignment
+                      .start,
+
+              children: [
+                pw.Expanded(
+                  flex: 3,
+
+                  child:
+                      pw.Text(
+                    'Thank you for choosing us.\n'
+                    'We look forward to hosting you again.\n'
+                    'Best Regards,\n'
+                    'Neyyar Heritage Inn.',
+
+                    style:
+                        bodyStyle,
+                  ),
+                ),
+
+                pw.Expanded(
+                  flex: 2,
+
+                  child:
+                      pw.Column(
+                    crossAxisAlignment:
+                        pw.CrossAxisAlignment
+                            .end,
+
+                    children: [
+                      _pdfTotalRow(
+                        'Total',
+                        data['subtotal'],
+                        bodyStyle,
+                      ),
+
+                      _pdfTotalRow(
+                        'GST (5%)',
+                        data['gst'],
+                        bodyStyle,
+                      ),
+
+                      _pdfTotalRow(
+                        'Advance',
+                        data['advance'],
+                        bodyStyle,
+                      ),
+
+                      _pdfTotalRow(
+                        'Discount',
+                        data['discount'],
+                        bodyStyle,
+                      ),
+
+                      pw.Divider(),
+
+                      _pdfTotalRow(
+                        'Balance',
+                        data['balance'],
+                        boldStyle,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            pw.SizedBox(
+              height: 24,
+            ),
+
+            /// FOOTER
+            pw.Container(
+              color: green,
+
+              padding:
+                  const pw.EdgeInsets
+                      .all(
+                10,
+              ),
+
+              child: pw.Row(
+                children: [
+                  pw.Expanded(
+                    child:
+                        pw.Text(
+                      '9656763391',
+
+                      style:
+                          const pw.TextStyle(
+                        color:
+                            PdfColors.white,
+                      ),
+                    ),
+                  ),
+
+                  pw.Expanded(
+                    child:
+                        pw.Text(
+                      'neyyarheritageinn@gmail.com',
+
+                      textAlign:
+                          pw.TextAlign
+                              .center,
+
+                      style:
+                          const pw.TextStyle(
+                        color:
+                            PdfColors.white,
+                      ),
+                    ),
+                  ),
+
+                  pw.Expanded(
+                    child:
+                        pw.Text(
+                      'www.neyyarheritage.in',
+
+                      textAlign:
+                          pw.TextAlign
+                              .right,
+
+                      style:
+                          const pw.TextStyle(
+                        color:
+                            PdfColors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ];
+        },
+      ),
     );
   }
+
+  await Printing.layoutPdf(
+    onLayout: (_) async {
+      return pdf.save();
+    },
+  );
+}
 
   Widget _buildTable(
     BillHistoryStore store,
@@ -675,4 +1055,43 @@ class _BillsScreenState extends State<BillsScreen> {
       59,
     );
   }
+  /// PDF TABLE HEADER
+pw.Widget _pdfHeaderCell(String text) {
+  return pw.Padding(
+    padding: const pw.EdgeInsets.all(8),
+    child: pw.Text(
+      text,
+      style: pw.TextStyle(
+        color: PdfColors.white,
+        fontWeight: pw.FontWeight.bold,
+      ),
+    ),
+  );
+}
+
+/// PDF NORMAL CELL
+pw.Widget _pdfCell(String text) {
+  return pw.Padding(
+    padding: const pw.EdgeInsets.all(8),
+    child: pw.Text(text),
+  );
+}
+
+/// PDF TOTAL ROW
+pw.Widget _pdfTotalRow(
+  String label,
+  dynamic value,
+  pw.TextStyle style,
+) {
+  return pw.Row(
+    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+    children: [
+      pw.Text(label, style: style),
+      pw.Text(
+        '₹${int.tryParse(value?.toString() ?? '') ?? 0}',
+        style: style,
+      ),
+    ],
+  );
+}
 }

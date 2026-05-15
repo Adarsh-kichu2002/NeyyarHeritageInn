@@ -8,12 +8,15 @@ class BillScreen extends StatefulWidget {
   @override
   State<BillScreen> createState() => _BillScreenState();
 }
-final FirebaseFirestore _db =
-    FirebaseFirestore.instance;
 
 class _BillScreenState extends State<BillScreen> {
+  final FirebaseFirestore _db =
+      FirebaseFirestore.instance;
+
   Map<String, dynamic> billData = {};
+
   bool isEdit = false;
+  bool _initialized = false;
 
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
@@ -22,107 +25,86 @@ class _BillScreenState extends State<BillScreen> {
   DateTime? checkIn;
   DateTime? checkOut;
 
-  bool _initialized = false;
-
   @override
-void didChangeDependencies() {
-  super.didChangeDependencies();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
 
-  if (_initialized) return;
-  _initialized = true;
+    if (_initialized) return;
+    _initialized = true;
 
-  _loadBillData();
-}
-
-Future<void> _loadBillData() async {
-  final args =
-      ModalRoute.of(context)?.settings.arguments
-          as Map<String, dynamic>?;
-
-  billData = args ?? {};
-
-  isEdit = billData['isEdit'] == true;
-
-  /// Preserve billId in edit mode
-  if (isEdit && billData['billId'] != null) {
-    billData['billId'] =
-        billData['billId'];
+    _loadData();
   }
 
-  /// TEXT VALUES
-  _nameCtrl.text =
-      billData['customerName'] ?? '';
+  Future<void> _loadData() async {
+    final args =
+        ModalRoute.of(context)?.settings.arguments
+            as Map<String, dynamic>?;
 
-  _phoneCtrl.text =
-      billData['phone1'] ?? '';
+    billData = args ?? {};
 
-  /// =========================
-  /// INVOICE NUMBER LOGIC
-  /// =========================
+    isEdit = billData['isEdit'] == true;
 
-  if (isEdit) {
-    /// Keep same invoice in edit
-    _invoiceCtrl.text =
-        billData['invoiceNo']
-                ?.toString() ??
-            '';
-  } else {
-    /// Auto-generate for new bill
-    final snapshot =
-        await _db
-            .collection('bills')
-            .orderBy(
-              'invoiceNo',
-              descending: true,
-            )
-            .limit(1)
-            .get();
+    _nameCtrl.text =
+        billData['customerName'] ?? '';
 
-    int nextInvoice = 19;
+    _phoneCtrl.text =
+        billData['phone1'] ?? '';
 
-    if (snapshot.docs.isNotEmpty) {
-      final lastInvoice =
-          int.tryParse(
-                snapshot
-                    .docs
-                    .first['invoiceNo']
-                    .toString(),
-              ) ??
-              18;
-
-      nextInvoice =
-          lastInvoice + 1;
+    /// EDIT MODE → KEEP SAME INVOICE
+    if (isEdit) {
+      _invoiceCtrl.text =
+          billData['invoiceNo']
+                  ?.toString() ??
+              '';
     }
 
-    _invoiceCtrl.text =
-        nextInvoice.toString();
+    /// CREATE MODE → GENERATE NEXT INVOICE
+    else {
+      final snapshot =
+          await _db
+              .collection('bills')
+              .orderBy(
+                'invoiceNoInt',
+                descending: true,
+              )
+              .limit(1)
+              .get();
+
+      int nextInvoice = 32;
+
+      if (snapshot.docs.isNotEmpty) {
+        final lastInvoice =
+            snapshot.docs.first.data()['invoiceNoInt'] ?? 31;
+
+        nextInvoice =
+            (lastInvoice as int) + 1;
+      }
+
+      _invoiceCtrl.text =
+          nextInvoice.toString();
+    }
+
+    checkIn =
+        _parseDate(billData['checkInDate']) ??
+            DateTime.now();
+
+    checkOut =
+        _parseDate(billData['checkOutDate']) ??
+            DateTime.now().add(
+              const Duration(days: 1),
+            );
+
+    if (mounted) {
+      setState(() {});
+    }
   }
-
-  /// DATE HANDLING
-  checkIn = _parseDate(
-    billData['checkInDate'],
-  );
-
-  checkOut = _parseDate(
-    billData['checkOutDate'],
-  );
-
-  checkIn ??= DateTime.now();
-
-  checkOut ??=
-      DateTime.now().add(
-    const Duration(days: 1),
-  );
-
-  if (mounted) {
-    setState(() {});
-  }
-}
 
   DateTime? _parseDate(dynamic value) {
     if (value == null) return null;
 
-    if (value is DateTime) return value;
+    if (value is DateTime) {
+      return value;
+    }
 
     if (value is String) {
       return DateTime.tryParse(value);
@@ -135,42 +117,75 @@ Future<void> _loadBillData() async {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(isEdit ? 'Edit Bill' : 'Create Bill'),
+        title: Text(
+          isEdit
+              ? 'Edit Bill'
+              : 'Create Bill',
+        ),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16),
+        padding:
+            const EdgeInsets.all(16),
         child: Column(
           children: [
             TextField(
               controller: _nameCtrl,
-              decoration: const InputDecoration(labelText: 'Guest Name'),
-            ),
-            TextField(
-              controller: _phoneCtrl,
-              decoration: const InputDecoration(labelText: 'Phone'),
-              keyboardType: TextInputType.phone,
-            ),
-            TextField(
-              controller: _invoiceCtrl,
               decoration:
-                  const InputDecoration(labelText: 'Invoice Number'),
-              keyboardType: TextInputType.number,
+                  const InputDecoration(
+                labelText:
+                    'Guest Name',
+              ),
             ),
 
-            const SizedBox(height: 12),
+            TextField(
+              controller: _phoneCtrl,
+              keyboardType:
+                  TextInputType.phone,
+              decoration:
+                  const InputDecoration(
+                labelText: 'Phone',
+              ),
+            ),
+
+            TextField(
+              controller: _invoiceCtrl,
+              keyboardType:
+                  TextInputType.number,
+              decoration:
+                  const InputDecoration(
+                labelText:
+                    'Invoice Number',
+              ),
+            ),
+
+            const SizedBox(
+              height: 12,
+            ),
 
             Row(
               children: [
                 _dateBtn(
                   'Check In',
                   checkIn,
-                  (d) => setState(() => checkIn = d),
+                  (d) {
+                    setState(() {
+                      checkIn = d;
+                    });
+                  },
                 ),
-                const SizedBox(width: 8),
+
+                const SizedBox(
+                  width: 8,
+                ),
+
                 _dateBtn(
                   'Check Out',
                   checkOut,
-                  (d) => setState(() => checkOut = d),
+                  (d) {
+                    setState(() {
+                      checkOut = d;
+                    });
+                  },
                 ),
               ],
             ),
@@ -178,25 +193,53 @@ Future<void> _loadBillData() async {
             const Spacer(),
 
             SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                child: const Text('Next'),
+              width:
+                  double.infinity,
+              child:
+                  ElevatedButton(
                 onPressed: () {
                   Navigator.pushNamed(
                     context,
                     '/bill_list',
                     arguments: {
                       ...billData,
-                      'isEdit': isEdit,
-                      'billId': billData['billId'], // ✅ preserve
-                      'customerName': _nameCtrl.text.trim(),
-                      'phone1': _phoneCtrl.text.trim(),
-                      'invoiceNo': _invoiceCtrl.text.trim(),
-                      'checkInDate': checkIn,
-                      'checkOutDate': checkOut,
+
+                      'isEdit':
+                          isEdit,
+
+                      'customerName':
+                          _nameCtrl.text
+                              .trim(),
+
+                      'phone1':
+                          _phoneCtrl.text
+                              .trim(),
+
+                      'invoiceNo':
+                          _invoiceCtrl
+                              .text
+                              .trim(),
+
+                      /// IMPORTANT
+                      'invoiceNoInt':
+                          int.tryParse(
+                                _invoiceCtrl
+                                    .text,
+                              ) ??
+                              0,
+
+                      'checkInDate':
+                          checkIn,
+
+                      'checkOutDate':
+                          checkOut,
                     },
                   );
                 },
+                child:
+                    const Text(
+                  'Next',
+                ),
               ),
             ),
           ],
@@ -208,26 +251,43 @@ Future<void> _loadBillData() async {
   Widget _dateBtn(
     String label,
     DateTime? date,
-    ValueChanged<DateTime> onPick,
+    Function(DateTime) onPick,
   ) {
     return Expanded(
-      child: OutlinedButton(
+      child:
+          OutlinedButton(
+        onPressed:
+            () async {
+          final picked =
+              await showDatePicker(
+            context:
+                context,
+            initialDate:
+                date ??
+                    DateTime.now(),
+            firstDate:
+                DateTime(
+                    2020),
+            lastDate:
+                DateTime(
+                    2100),
+          );
+
+          if (picked !=
+              null) {
+            onPick(
+                picked);
+          }
+        },
         child: Text(
           date == null
               ? label
-              : DateFormat('dd/MM/yyyy').format(date),
+              : DateFormat(
+                  'dd/MM/yyyy',
+                ).format(
+                  date,
+                ),
         ),
-        onPressed: () async {
-          final picked = await showDatePicker(
-            context: context,
-            initialDate: date ?? DateTime.now(),
-            firstDate: DateTime(2020),
-            lastDate: DateTime(2100),
-          );
-          if (picked != null) {
-            onPick(picked);
-          }
-        },
       ),
     );
   }

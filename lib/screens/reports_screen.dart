@@ -407,6 +407,15 @@ Expanded(
               ),
               DataColumn(
                 label: Text(
+                  "Advance",
+                  style: TextStyle(
+                    fontWeight:
+                        FontWeight.bold,
+                  ),
+                ),
+              ),
+              DataColumn(
+                label: Text(
                   "Bill Amount",
                   style: TextStyle(
                     fontWeight:
@@ -423,62 +432,97 @@ Expanded(
                   ),
                 ),
               ),
+               DataColumn(
+                label: Text(
+                  "Total Amount",
+                  style: TextStyle(
+                    fontWeight:
+                        FontWeight.bold,
+                  ),
+                ),
+              ),
             ],
 
             rows: monthBills.map((bill) {
-              final payment =
-                  bill['payment'];
+  final payment = bill['payment'];
 
-              final paid =
-                  payment != null
-                      ? payment[
-                              'paidAmount'] ??
-                          0
-                      : 0;
+  final int paid = payment != null
+      ? _toInt(payment['paidAmount'])
+      : 0;
 
-              return DataRow(
-                cells: [
-                  DataCell(
-                    Text(
-                      '${bill['invoiceNo']}',
-                    ),
-                  ),
+  final int advance =
+      _toInt(bill['advance']);
 
-                  DataCell(
-                    Text(
-                      _fmt(
-                        bill[
-                            'checkOutDate'],
-                      ),
-                    ),
-                  ),
+  final int totalAmount =
+      advance + paid;
 
-                  DataCell(
-                    Text(
-                      '${bill['customerName']}',
-                    ),
-                  ),
+  return DataRow(
+    cells: [
 
-                  DataCell(
-                    Text(
-                      '${bill['package'] ?? 'Others'}',
-                    ),
-                  ),
+      /// Invoice No
+      DataCell(
+        Text(
+          '${bill['invoiceNo']}',
+        ),
+      ),
 
-                  DataCell(
-                    Text(
-                      '₹${bill['balance']}',
-                    ),
-                  ),
+      /// Checkout Date
+      DataCell(
+        Text(
+          _fmt(
+            bill['checkOutDate'],
+          ),
+        ),
+      ),
 
-                  DataCell(
-                    Text(
-                      '₹$paid',
-                    ),
-                  ),
-                ],
-              );
-            }).toList(),
+      /// Guest Name
+      DataCell(
+        Text(
+          '${bill['customerName']}',
+        ),
+      ),
+
+      /// Package
+      DataCell(
+        Text(
+          '${bill['package'] ?? 'Others'}',
+        ),
+      ),
+
+      /// Advance
+      DataCell(
+        Text(
+          '₹$advance',
+        ),
+      ),
+
+      /// Bill Amount
+      DataCell(
+        Text(
+          '₹${_toInt(bill['balance'])}',
+        ),
+      ),
+
+      /// Paid Amount
+      DataCell(
+        Text(
+          '₹$paid',
+        ),
+      ),
+
+      /// Total Amount
+      DataCell(
+        Text(
+          '₹$totalAmount',
+          style: const TextStyle(
+            fontWeight:
+                FontWeight.bold,
+          ),
+        ),
+      ),
+    ],
+  );
+}).toList(),
           ),
         ),
       );
@@ -566,32 +610,63 @@ Expanded(
             pw.SizedBox(height: 20),
 
             pw.Table.fromTextArray(
-              headers: [
-                'Bill',
-                'Date',
-                'Guest',
-                'Package',
-                'Bill',
-                'Paid',
-              ],
-              data: bills.map((bill) {
-                final payment = bill['payment'];
+  headers: [
+    'Invoice',
+    'Date',
+    'Guest',
+    'Package',
+    'Advance',
+    'Bill',
+    'Paid',
+    'Total',
+  ],
+  headerStyle: pw.TextStyle(
+    fontWeight: pw.FontWeight.bold,
+    fontSize: 9,
+  ),
+  cellStyle: const pw.TextStyle(
+    fontSize: 8,
+  ),
+  columnWidths: {
+    0: const pw.FlexColumnWidth(1.2),
+    1: const pw.FlexColumnWidth(1.5),
+    2: const pw.FlexColumnWidth(2),
+    3: const pw.FlexColumnWidth(2),
+    4: const pw.FlexColumnWidth(1.2),
+    5: const pw.FlexColumnWidth(1.2),
+    6: const pw.FlexColumnWidth(1.2),
+    7: const pw.FlexColumnWidth(1.2),
+  },
+  data: bills.map((bill) {
+    final payment = bill['payment'];
 
-                final paid =
-                    payment != null
-                        ? payment['paidAmount'] ?? 0
-                        : 0;
+    final int paid = payment != null
+        ? _toInt(payment['paidAmount'])
+        : 0;
 
-                return [
-                  '${bill['invoiceNo']}',
-                  _fmt(bill['checkOutDate']),
-                  '${bill['customerName']}',
-                  '${bill['package'] ?? 'Others'}',
-                  'Rs ${bill['balance']}',
-                  'Rs $paid',
-                ];
-              }).toList(),
-            ),
+    final int advance =
+        _toInt(bill['advance']);
+
+    final int billAmount =
+        _toInt(bill['balance']);
+
+    final int totalAmount =
+        advance + paid;
+
+    return [
+      '${bill['invoiceNo']}',
+      _fmt(
+        bill['checkOutDate'],
+      ),
+      '${bill['customerName']}',
+      '${bill['package'] ?? 'Others'}',
+      'Rs $advance',
+      'Rs $billAmount',
+      'Rs $paid',
+      'Rs $totalAmount',
+    ];
+  }).toList(),
+),
 
             pw.SizedBox(height: 20),
 
